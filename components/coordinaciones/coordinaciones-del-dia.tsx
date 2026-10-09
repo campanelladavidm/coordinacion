@@ -84,7 +84,7 @@ function CustodiasDialog({ fecha, onClose }: { fecha: string; onClose: () => voi
 }
 
 export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; tituloFecha: string }) {
-  const { coordinaciones, custodias, catalogos, ready, actualizarCoordinacion, reordenarCoordinaciones, eliminarSolicitudCustodia } = useCoordinacionesDemo();
+  const { coordinaciones, custodias, catalogos, ready, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, eliminarSolicitudCustodia } = useCoordinacionesDemo();
   const nombreTercerizada = (id: string | null) => catalogos.tercerizadas.find((opcion) => opcion.id === id)?.nombre ?? "Sin tercerizada";
   const nombreCuadrilla = (id: string | null) => catalogos.cuadrillas.find((opcion) => opcion.id === id)?.nombre ?? "Sin cuadrilla asignada";
   const [abierta, setAbierta] = useState<string | null>(null);
@@ -93,6 +93,8 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
   const [cuadrillaCopiada, setCuadrillaCopiada] = useState<string | null>(null);
   const [errorEstado, setErrorEstado] = useState("");
   const [errorCustodia, setErrorCustodia] = useState("");
+  const [errorCoordinacion, setErrorCoordinacion] = useState("");
+  const [eliminandoCoordinacion, setEliminandoCoordinacion] = useState<string | null>(null);
   const [errorOrden, setErrorOrden] = useState("");
   const [errorMapa, setErrorMapa] = useState("");
   const [idArrastrado, setIdArrastrado] = useState<string | null>(null);
@@ -201,6 +203,19 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
     }
   }
 
+  async function eliminarCaso(coordinacion: Coordinacion) {
+    if (!window.confirm(`¿Querés eliminar la coordinación ${coordinacion.ticket}? Esta acción no se puede deshacer.`)) return;
+    setErrorCoordinacion("");
+    setEliminandoCoordinacion(coordinacion.id);
+    try {
+      await eliminarCoordinacion(coordinacion.id);
+    } catch (cause) {
+      setErrorCoordinacion(cause instanceof Error ? cause.message : "No se pudo eliminar la coordinación.");
+    } finally {
+      setEliminandoCoordinacion(null);
+    }
+  }
+
   const grupos = new Map<string, Map<string, Coordinacion[]>>();
   for (const coordinacion of coordinacionesFiltradas) {
     const tercerizadaId = coordinacion.tercerizadaId ?? "sin-tercerizada";
@@ -226,6 +241,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
       {errorMapa && <p className="text-sm text-amber-200" role="status">{errorMapa}</p>}
 
       {errorCustodia && <p className="text-sm text-rose-300" role="alert">{errorCustodia}</p>}
+      {errorCoordinacion && <p className="text-sm text-rose-300" role="alert">{errorCoordinacion}</p>}
       {solicitudesDelDia.length > 0 && <section className="custody-section"><div className="daily-section-heading"><h2 className="section-title">Custodias y policías</h2><span className="daily-count">{solicitudesDelDia.length} solicitudes</span></div><div className="custody-card-grid">{solicitudesDelDia.map((solicitud) => <article key={solicitud.id} className="panel custody-card">
         <button className="custody-delete-button" type="button" title="Eliminar solicitud" aria-label={`Eliminar solicitud de ${solicitud.tipo === "POLICIA" ? "policía" : "custodia"} para ${nombreCuadrilla(solicitud.cuadrillaId)}`} onClick={() => void eliminarCustodia(solicitud.id)}>
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3.5h6M4.5 5.5h11m-9.5 0 .65 11h6.7l.65-11M8 8.5v5m4-5v5" /></svg>
@@ -263,6 +279,9 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
                   <div className="coordination-list">
                     {itemsOrdenados.map((coordinacion) => (
                       <article key={coordinacion.id} className={`coordination-item${idArrastrado === coordinacion.id ? " is-dragging" : ""}`} onDragStart={(event) => iniciarArrastre(event, coordinacion.id)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }} onDrop={(event) => soltarCoordinacion(event, coordinacion.id, itemsOrdenados)} onDragEnd={() => setIdArrastrado(null)}>
+                        <button className="custody-delete-button coordination-delete-button" type="button" disabled={eliminandoCoordinacion === coordinacion.id} title="Eliminar coordinación" aria-label={`Eliminar coordinación ${coordinacion.ticket}`} onClick={() => void eliminarCaso(coordinacion)}>
+                          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3.5h6M4.5 5.5h11m-9.5 0 .65 11h6.7l.65-11M8 8.5v5m4-5v5" /></svg>
+                        </button>
                         <button type="button" className="coordination-summary" aria-expanded={abierta === coordinacion.id} onClick={() => setAbierta(abierta === coordinacion.id ? null : coordinacion.id)} onDoubleClick={(event) => {
                           if (!(event.target as HTMLElement).closest(".state-badge")) return;
                           event.preventDefault();

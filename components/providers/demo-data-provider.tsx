@@ -36,6 +36,7 @@ type DemoContextValue = {
   ready: boolean; error: string | null;
   crearCoordinacion: (coordinacion: NuevaCoordinacion) => Promise<void>;
   actualizarCoordinacion: (id: string, coordinacion: NuevaCoordinacion) => Promise<void>;
+  eliminarCoordinacion: (id: string) => Promise<void>;
   reordenarCoordinaciones: (ids: string[]) => Promise<void>;
   crearSolicitudCustodia: (solicitud: NuevaSolicitudCustodia) => Promise<void>;
   eliminarSolicitudCustodia: (id: string) => Promise<void>;
@@ -215,6 +216,14 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     setCoordinaciones((actuales) => actuales.map((item) => item.id === id ? { ...actualizacion, id, orden } : item));
   }, [coordinaciones]);
 
+  const eliminarCoordinacion = useCallback(async (id: string) => {
+    const supabase = createClient();
+    const { data, error: deleteError } = await supabase.from("coordinaciones").delete().eq("id", id).select("id").maybeSingle();
+    lanzarError(deleteError);
+    if (!data) throw new Error("No se encontró la coordinación o no tenés permiso para eliminarla.");
+    setCoordinaciones((actuales) => actuales.filter((item) => item.id !== id));
+  }, []);
+
   const reordenarCoordinaciones = useCallback(async (ids: string[]) => {
     if (ids.length < 2) return;
     const supabase = createClient();
@@ -308,10 +317,10 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     coordinaciones, custodias, feriados, notasEquipo, catalogos, rolDemo, usuarioActual,
-    ready, error, crearCoordinacion, actualizarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
+    ready, error, crearCoordinacion, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
     guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo,
   }), [coordinaciones, custodias, feriados, notasEquipo, catalogos, rolDemo, usuarioActual, ready, error,
-    crearCoordinacion, actualizarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
+    crearCoordinacion, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
 }
