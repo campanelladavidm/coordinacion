@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Coordinaciones WN
 
-## Getting Started
+Aplicación interna en español para gestionar la coordinación diaria del área de instalaciones. Usa Next.js 16, React 19, TypeScript, Tailwind CSS 4, Supabase Auth y PostgreSQL.
 
-First, run the development server:
+## Desarrollo local
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La aplicación requiere un proyecto Supabase configurado. Copiá `.env.example` como `.env.local`, cargá la URL del proyecto y su clave pública (publishable key; la clave `anon` existente también es compatible) y reiniciá el servidor de desarrollo.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Preparar Supabase
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+En un proyecto Supabase nuevo, abrí **SQL Editor** y ejecutá en este orden:
 
-## Learn More
+1. `supabase/migrations/202610070001_initial_schema.sql`
+2. `supabase/migrations/202610080002_shared_catalogs_notes_holidays.sql`
 
-To learn more about Next.js, take a look at the following resources:
+Las migraciones crean el esquema relacional, catálogos iniciales, zonas y cuadrillas conocidas, perfiles, políticas RLS, notas del equipo y feriados con asignaciones de personal. La segunda migración conserva los datos anteriores y añade el horario de retiro de custodias como texto libre.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Después, creá las cuentas internas en **Authentication → Users**. El trigger crea un perfil Coordinador para cada cuenta nueva. Para asignar el primer rol Jefe, ejecutá desde SQL Editor —reemplazando el correo—:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```sql
+update public.usuarios as u
+set rol_id = r.id
+from public.roles as r
+where r.codigo = 'JEFE'
+  and u.id = (select id from auth.users where email = 'TU_CORREO_INTERNO');
+```
 
-## Deploy on Vercel
+Los roles posteriores se administran desde la aplicación. Las operaciones de datos están sujetas a las políticas RLS de Supabase.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Administración de usuarios
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+La sección **Usuarios** permite invitar por correo, cambiar el nombre y el rol, y activar o desactivar cuentas. Para estas operaciones del lado servidor, agregá una clave secreta de Supabase a `.env.local`:
+
+```env
+SUPABASE_SECRET_KEY=sb_secret_...
+```
+
+Obtenela desde las claves API del proyecto. No uses el prefijo `NEXT_PUBLIC_` para esta variable ni la compartas o la subas al repositorio. Reiniciá `npm run dev` después de guardarla. En Vercel, cargá la misma variable como secreto de entorno del servidor.
+
+En **Authentication → URL Configuration**, permití la URL local `http://localhost:3000/cuenta/establecer-contrasena` para que el enlace de invitación permita definir una contraseña. Agregá también la URL equivalente del dominio de producción. Configurá el servicio SMTP de Auth para entregar invitaciones al equipo.
+
+La desactivación conserva las coordinaciones y notas históricas asociadas a la cuenta. Solo un Jefe activo puede cambiar permisos de usuarios; la API valida el rol en cada operación.
+
+## Estructura
+
+- `app/`: rutas App Router: calendario, coordinaciones, configuraciones, usuarios y acceso.
+- `components/`: shell, navegación, calendario, formularios y vistas reutilizables.
+- `lib/supabase/`: clientes de navegador/servidor y renovación de sesión mediante `proxy.ts`.
+- `supabase/migrations/`: esquema PostgreSQL, catálogos y políticas RLS.
+- `types/database.ts`: tipos del esquema consumidos por el cliente Supabase.
