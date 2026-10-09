@@ -1,5 +1,7 @@
 import { CoordinacionesDelDia } from "@/components/coordinaciones/coordinaciones-del-dia";
 
+export const instant = false;
+
 export default async function CoordinacionesDiariasPage({ params }: { params: Promise<{ fecha: string }> }) {
   const { fecha } = await params;
   const date = new Date(fecha + "T12:00:00Z");
