@@ -38,6 +38,7 @@ type DemoContextValue = {
   ready: boolean; error: string | null;
   crearCoordinacion: (coordinacion: NuevaCoordinacion) => Promise<void>;
   actualizarCoordinacion: (id: string, coordinacion: NuevaCoordinacion) => Promise<void>;
+  asignarCoordinaciones: (ids: string[], cuadrillaId: string) => Promise<void>;
   moverCoordinacion: (id: string, tercerizadaId: string | null, cuadrillaId: string | null) => Promise<void>;
   eliminarCoordinacion: (id: string) => Promise<void>;
   reordenarCoordinaciones: (ids: string[]) => Promise<void>;
@@ -236,6 +237,38 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     setCoordinaciones((actuales) => actuales.map((item) => item.id === id ? { ...actualizacion, id, orden } : item));
   }, [coordinaciones]);
 
+  const asignarCoordinaciones = useCallback(async (ids: string[], cuadrillaId: string) => {
+    if (ids.length === 0) throw new Error("Seleccioná al menos un caso sin cuadrilla.");
+    const cuadrilla = catalogos.cuadrillas.find((item) => item.id === cuadrillaId && item.activo !== false);
+    if (!cuadrilla) throw new Error("La cuadrilla elegida ya no está disponible.");
+
+    const seleccionadas = ids.map((id) => coordinaciones.find((item) => item.id === id));
+    if (seleccionadas.some((item) => !item || item.cuadrillaId !== null)) {
+      throw new Error("Alguno de los casos ya fue asignado. Actualizá la página y volvé a seleccionar.");
+    }
+    const fecha = seleccionadas[0]?.fecha;
+    if (!fecha || seleccionadas.some((item) => item?.fecha !== fecha)) {
+      throw new Error("Seleccioná casos del mismo día para asignarlos juntos.");
+    }
+
+    const supabase = createClient();
+    const { error: asignacionError } = await supabase.rpc("asignar_coordinaciones_a_cuadrilla", {
+      p_ids: ids,
+      p_cuadrilla_id: cuadrillaId,
+    });
+    lanzarError(asignacionError);
+
+    const idsSeleccionados = new Set(ids);
+    const existentes = coordinaciones
+      .filter((item) => !idsSeleccionados.has(item.id) && item.fecha === fecha && (item.tercerizadaId ?? "") === cuadrilla.tercerizadaId && item.cuadrillaId === cuadrillaId)
+      .sort((a, b) => a.orden - b.orden);
+    const ordenInicial = existentes.reduce((mayor, item) => Math.max(mayor, item.orden), -1) + 1;
+    const ordenes = new Map(ids.map((id, index) => [id, ordenInicial + index]));
+    setCoordinaciones((actuales) => actuales.map((item) => idsSeleccionados.has(item.id)
+      ? { ...item, tercerizadaId: cuadrilla.tercerizadaId || null, cuadrillaId, orden: ordenes.get(item.id) ?? item.orden }
+      : item));
+  }, [catalogos.cuadrillas, coordinaciones]);
+
   const moverCoordinacion = useCallback(async (id: string, tercerizadaId: string | null, cuadrillaId: string | null) => {
     const anterior = coordinaciones.find((item) => item.id === id);
     if (!anterior) throw new Error("No se encontró la coordinación que querés mover.");
@@ -411,10 +444,10 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, usuarioActual,
-    ready, error, crearCoordinacion, actualizarCoordinacion, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
+    ready, error, crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
     guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo,
   }), [coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, usuarioActual, ready, error,
-    crearCoordinacion, actualizarCoordinacion, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
+    crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
 }

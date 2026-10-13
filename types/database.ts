@@ -40,7 +40,11 @@ export type Database = {
       notas_equipo: Table<{ id: string; comentario: string; creado_por: string; created_at: string }, { id?: string; comentario: string; creado_por: string; created_at?: string }>;
     };
     Views: Record<string, never>;
-    Functions: { mi_rol: { Args: Record<string, never>; Returns: string | null }; reordenar_coordinaciones: { Args: { p_ids: string[] }; Returns: undefined } };
+    Functions: {
+      mi_rol: { Args: Record<string, never>; Returns: string | null };
+      reordenar_coordinaciones: { Args: { p_ids: string[] }; Returns: undefined };
+      asignar_coordinaciones_a_cuadrilla: { Args: { p_ids: string[]; p_cuadrilla_id: string }; Returns: undefined };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
