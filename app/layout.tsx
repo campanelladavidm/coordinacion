@@ -5,8 +5,9 @@ import { DemoDataProvider } from "@/components/providers/demo-data-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Coordinaciones WN", template: "%s | Coordinaciones WN" },
+  title: { default: "coordi westnet", template: "%s | coordi westnet" },
   description: "Coordinación diaria del área de instalaciones.",
+  icons: { icon: "/brand/phone.png" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

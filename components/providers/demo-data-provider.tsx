@@ -15,6 +15,7 @@ export type NuevaCoordinacion = Omit<Coordinacion, "id" | "orden">;
 export type TipoCustodia = "CUSTODIA" | "POLICIA";
 export type SolicitudCustodia = { id: string; fecha: string; tipo: TipoCustodia; cuadrillaId: string; horarioId: string };
 export type NuevaSolicitudCustodia = Omit<SolicitudCustodia, "id">;
+export type RangoCuadrilla = { fecha: string; cuadrillaId: string; cantidadTickets: number | null; noTrabaja: boolean };
 export type CatalogoKey = "tercerizadas" | "cuadrillas" | "tecnologias" | "categorias" | "horarios" | "zonas" | "estados" | "extras";
 export type CuadrillaCatalogo = CatalogOption & { tercerizadaId: string };
 export type CatalogosDemo = {
@@ -32,6 +33,7 @@ const CATALOGOS_INICIALES: CatalogosDemo = {
 
 type DemoContextValue = {
   coordinaciones: Coordinacion[]; custodias: SolicitudCustodia[]; feriados: FeriadoInterno[];
+  rangos: RangoCuadrilla[]; errorRangos: string | null;
   notasEquipo: NotaEquipo[]; catalogos: CatalogosDemo; rolDemo: DemoRole; usuarioActual: UsuarioActual | null;
   ready: boolean; error: string | null;
   crearCoordinacion: (coordinacion: NuevaCoordinacion) => Promise<void>;
@@ -40,6 +42,7 @@ type DemoContextValue = {
   reordenarCoordinaciones: (ids: string[]) => Promise<void>;
   crearSolicitudCustodia: (solicitud: NuevaSolicitudCustodia) => Promise<void>;
   eliminarSolicitudCustodia: (id: string) => Promise<void>;
+  guardarRangos: (fecha: string, filas: Omit<RangoCuadrilla, "fecha">[]) => Promise<void>;
   guardarFeriado: (feriado: FeriadoInterno) => Promise<void>;
   quitarFeriado: (fecha: string) => Promise<void>;
   agregarNotaEquipo: (comentario: string) => Promise<void>;
@@ -72,6 +75,8 @@ function mapearCustodia(row: { id: string; fecha: string; tipo: TipoCustodia; cu
 export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [coordinaciones, setCoordinaciones] = useState<Coordinacion[]>([]);
   const [custodias, setCustodias] = useState<SolicitudCustodia[]>([]);
+  const [rangos, setRangos] = useState<RangoCuadrilla[]>([]);
+  const [errorRangos, setErrorRangos] = useState<string | null>(null);
   const [feriados, setFeriados] = useState<FeriadoInterno[]>([]);
   const [notasEquipo, setNotasEquipo] = useState<NotaEquipo[]>([]);
   const [catalogos, setCatalogos] = useState<CatalogosDemo>(CATALOGOS_INICIALES);
@@ -94,14 +99,14 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
       const [tercerizadasQ, cuadrillasQ, tecnologiasQ, categoriasQ, horariosQ, zonasQ, estadosQ, extrasQ,
         coordinacionesQ, relacionesExtrasQ, custodiasQ, feriadosQ, personalQ, relacionesPersonalQ, notasQ] = await Promise.all([
-        supabase.from("tercerizadas").select("id,nombre,activo,orden").eq("activo", true).order("orden"),
-        supabase.from("cuadrillas").select("id,nombre,tercerizada_id,zona_id,activo,orden").eq("activo", true).order("orden"),
-        supabase.from("tecnologias").select("id,nombre,activo,orden").eq("activo", true).order("orden"),
-        supabase.from("categorias").select("id,nombre,activo,orden").eq("activo", true).order("orden"),
-        supabase.from("horarios").select("id,nombre,activo,orden").eq("activo", true).order("orden"),
-        supabase.from("zonas").select("id,nombre,activo,orden").eq("activo", true).order("orden"),
-        supabase.from("estados").select("id,nombre,activo,orden").eq("activo", true).order("orden"),
-        supabase.from("extras").select("id,nombre,activo,orden").eq("activo", true).order("orden"),
+        supabase.from("tercerizadas").select("id,nombre,activo,orden").order("orden"),
+        supabase.from("cuadrillas").select("id,nombre,tercerizada_id,zona_id,activo,orden").order("orden"),
+        supabase.from("tecnologias").select("id,nombre,activo,orden").order("orden"),
+        supabase.from("categorias").select("id,nombre,activo,orden").order("orden"),
+        supabase.from("horarios").select("id,nombre,activo,orden").order("orden"),
+        supabase.from("zonas").select("id,nombre,activo,orden").order("orden"),
+        supabase.from("estados").select("id,nombre,activo,orden").order("orden"),
+        supabase.from("extras").select("id,nombre,activo,orden").order("orden"),
         supabase.from("coordinaciones").select("id,fecha,ticket,cliente,tercerizada_id,cuadrilla_id,horario_id,tecnologia_id,categoria_id,observaciones,zona_id,estado_id,orden,ubicacion").order("fecha").order("created_at"),
         supabase.from("coordinacion_extras").select("coordinacion_id,extra_id"),
         supabase.from("custodias").select("id,fecha,tipo,cuadrilla_id,horario_retiro").order("fecha").order("created_at"),
@@ -112,6 +117,20 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       ]);
       [tercerizadasQ, cuadrillasQ, tecnologiasQ, categoriasQ, horariosQ, zonasQ, estadosQ, extrasQ,
         coordinacionesQ, relacionesExtrasQ, custodiasQ, feriadosQ, personalQ, relacionesPersonalQ, notasQ].forEach((query) => lanzarError(query.error));
+
+      const rangosQ = await supabase.from("rangos_cuadrilla").select("fecha,cuadrilla_id,cantidad_tickets,no_trabaja").order("fecha");
+      if (rangosQ.error) {
+        setRangos([]);
+        setErrorRangos(rangosQ.error.code === "42P01"
+          ? "La tabla de Rango todavía no existe. Aplicá la migración 202610120001_rangos_cuadrillas.sql en Supabase."
+          : `No se pudieron cargar los rangos: ${rangosQ.error.message}`);
+      } else {
+        setRangos((rangosQ.data ?? []).map((rango) => ({
+          fecha: rango.fecha, cuadrillaId: rango.cuadrilla_id,
+          cantidadTickets: rango.cantidad_tickets, noTrabaja: rango.no_trabaja,
+        })));
+        setErrorRangos(null);
+      }
 
       const coordinacionExtras = new Map<string, string[]>();
       for (const relacion of relacionesExtrasQ.data ?? []) {
@@ -129,14 +148,14 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       const autores = new Map((autoresQ.data ?? []).map((autor) => [autor.id, autor.nombre_completo]));
 
       setCatalogos({
-        tercerizadas: (tercerizadasQ.data ?? []).map(({ id, nombre }) => ({ id, nombre })),
-        cuadrillas: (cuadrillasQ.data ?? []).map(({ id, nombre, tercerizada_id }) => ({ id, nombre, tercerizadaId: tercerizada_id ?? "" })),
-        tecnologias: (tecnologiasQ.data ?? []).map(({ id, nombre }) => ({ id, nombre })),
-        categorias: (categoriasQ.data ?? []).map(({ id, nombre }) => ({ id, nombre })),
-        horarios: (horariosQ.data ?? []).map(({ id, nombre }) => ({ id, nombre })),
-        zonas: (zonasQ.data ?? []).map(({ id, nombre }) => ({ id, nombre })),
-        estados: (estadosQ.data ?? []).map(({ id, nombre }) => ({ id, nombre })),
-        extras: (extrasQ.data ?? []).map(({ id, nombre }) => ({ id, nombre })),
+        tercerizadas: (tercerizadasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
+        cuadrillas: (cuadrillasQ.data ?? []).map(({ id, nombre, tercerizada_id, activo }) => ({ id, nombre, tercerizadaId: tercerizada_id ?? "", activo })),
+        tecnologias: (tecnologiasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
+        categorias: (categoriasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
+        horarios: (horariosQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
+        zonas: (zonasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
+        estados: (estadosQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
+        extras: (extrasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
       });
       setCoordinaciones((coordinacionesQ.data ?? []).map((row) => mapearCoordinacion(row, coordinacionExtras.get(row.id) ?? [])));
       setCustodias((custodiasQ.data ?? []).map(mapearCustodia));
@@ -159,7 +178,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       if (!user) {
         setUsuarioActual(null);
         setRolDemo("COORDINADOR");
-        setCoordinaciones([]); setCustodias([]); setFeriados([]); setNotasEquipo([]);
+        setCoordinaciones([]); setCustodias([]); setRangos([]); setErrorRangos(null); setFeriados([]); setNotasEquipo([]);
         setReady(true);
         return;
       }
@@ -253,6 +272,27 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     setCustodias((actuales) => actuales.filter((solicitud) => solicitud.id !== id));
   }, []);
 
+  const guardarRangos = useCallback(async (fecha: string, filas: Omit<RangoCuadrilla, "fecha">[]) => {
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) throw new Error("Iniciá sesión para guardar el rango.");
+    const filasParaGuardar = filas.map((fila) => ({
+      fecha,
+      cuadrilla_id: fila.cuadrillaId,
+      cantidad_tickets: fila.noTrabaja ? null : fila.cantidadTickets ?? 0,
+      no_trabaja: fila.noTrabaja,
+      actualizado_por: auth.user.id,
+    }));
+    const { error: guardarError } = await supabase.from("rangos_cuadrilla").upsert(filasParaGuardar, { onConflict: "fecha,cuadrilla_id" });
+    lanzarError(guardarError);
+    const idsActualizados = new Set(filas.map((fila) => fila.cuadrillaId));
+    setRangos((actuales) => [
+      ...actuales.filter((rango) => rango.fecha !== fecha || !idsActualizados.has(rango.cuadrillaId)),
+      ...filas.map((fila) => ({ ...fila, cantidadTickets: fila.noTrabaja ? null : fila.cantidadTickets ?? 0, fecha })),
+    ]);
+    setErrorRangos(null);
+  }, []);
+
   const guardarFeriado = useCallback(async (feriado: FeriadoInterno) => {
     const supabase = createClient();
     const { data: auth } = await supabase.auth.getUser();
@@ -300,27 +340,54 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     if (rolDemo === "COORDINADOR") throw new Error("Solo Supervisor y Jefe pueden administrar catálogos.");
     const supabase = createClient();
     const anteriores = catalogos[tipo] as CatalogOption[];
+    const opcionesActivasAnteriores = anteriores.filter((opcion) => opcion.activo !== false);
     const nuevas = opciones as CatalogOption[];
     const idsNuevos = new Set(nuevas.map((opcion) => opcion.id));
+    const eliminados = opcionesActivasAnteriores.map((opcion) => opcion.id).filter((id) => !idsNuevos.has(id));
+    const cuadrillasArchivadas = tipo === "tercerizadas"
+      ? catalogos.cuadrillas.filter((cuadrilla) => cuadrilla.activo !== false && eliminados.includes(cuadrilla.tercerizadaId)).map((cuadrilla) => cuadrilla.id)
+      : [];
     const filas = tipo === "cuadrillas"
       ? (opciones as CuadrillaCatalogo[]).map((opcion, orden) => ({ id: opcion.id, nombre: opcion.nombre, tercerizada_id: opcion.tercerizadaId, activo: true, orden: (orden + 1) * 10 }))
       : nuevas.map((opcion, orden) => ({ id: opcion.id, nombre: opcion.nombre, activo: true, orden: (orden + 1) * 10 }));
+
     const { error: saveError } = await supabase.from(tipo).upsert(filas as never[], { onConflict: "id" });
     lanzarError(saveError);
-    const eliminados = anteriores.map((opcion) => opcion.id).filter((id) => !idsNuevos.has(id));
-    if (eliminados.length) {
-      const { error: deleteError } = await supabase.from(tipo).delete().in("id", eliminados);
-      lanzarError(deleteError);
+    if (cuadrillasArchivadas.length) {
+      const { error: archiveCrewsError } = await supabase.from("cuadrillas").update({ activo: false }).in("id", cuadrillasArchivadas);
+      lanzarError(archiveCrewsError);
     }
-    setCatalogos((actuales) => ({ ...actuales, [tipo]: opciones }));
+    if (eliminados.length) {
+      const { error: archiveError } = await supabase.from(tipo).update({ activo: false } as never).in("id", eliminados);
+      lanzarError(archiveError);
+    }
+
+    setCatalogos((actuales) => {
+      const actualesTipo = actuales[tipo] as CatalogOption[];
+      const archivadas = actualesTipo
+        .filter((opcion) => opcion.activo === false || eliminados.includes(opcion.id))
+        .map((opcion) => ({ ...opcion, activo: false }));
+      const idsArchivados = new Set(archivadas.map((opcion) => opcion.id));
+      const activas = nuevas.map((opcion) => ({ ...opcion, activo: true }));
+      const actualizados = {
+        ...actuales,
+        [tipo]: [...activas, ...archivadas.filter((opcion) => !idsNuevos.has(opcion.id))],
+      } as CatalogosDemo;
+      if (tipo === "tercerizadas" && cuadrillasArchivadas.length) {
+        actualizados.cuadrillas = actuales.cuadrillas.map((cuadrilla) => idsArchivados.has(cuadrilla.id) || cuadrillasArchivadas.includes(cuadrilla.id)
+          ? { ...cuadrilla, activo: false }
+          : cuadrilla);
+      }
+      return actualizados;
+    });
   }, [catalogos, rolDemo]);
 
   const value = useMemo(() => ({
-    coordinaciones, custodias, feriados, notasEquipo, catalogos, rolDemo, usuarioActual,
+    coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, usuarioActual,
     ready, error, crearCoordinacion, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
-    guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo,
-  }), [coordinaciones, custodias, feriados, notasEquipo, catalogos, rolDemo, usuarioActual, ready, error,
-    crearCoordinacion, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
+    guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo,
+  }), [coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, usuarioActual, ready, error,
+    crearCoordinacion, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
 }

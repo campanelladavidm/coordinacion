@@ -1,15 +1,13 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider";
 import { createClient } from "@/lib/supabase/client";
 
-const etiquetas = { COORDINADOR: "Coordinador", SUPERVISOR: "Supervisor", JEFE: "Jefe" };
-
 export function SessionControls() {
   const router = useRouter();
-  const { usuarioActual, rolDemo, error } = useCoordinacionesDemo();
+  const { usuarioActual, error } = useCoordinacionesDemo();
   const [cerrando, setCerrando] = useState(false);
 
   async function cerrarSesion() {
@@ -20,9 +18,15 @@ export function SessionControls() {
   }
 
   return usuarioActual ? (
-    <div className="flex items-center gap-3 text-xs text-slate-400">
-      <span className="topbar-status"><span className={"status-dot " + (error ? "bg-rose-400" : "status-dot-demo")} />{error ? "Error de conexión con Supabase" : `${usuarioActual.nombre} · ${etiquetas[rolDemo]}`}</span>
-      <button className="button button-small" type="button" onClick={cerrarSesion} disabled={cerrando}>{cerrando ? "Saliendo…" : "Cerrar sesión"}</button>
+    <div className="session-controls">
+      <span className="topbar-status" title={error ? "Error de conexión con Supabase" : "Sesión activa"}>
+        <span className={"status-dot " + (error ? "session-error-dot" : "status-dot-demo")} />
+        <span className="session-name">{usuarioActual.nombre}</span>
+      </span>
+      <button className="button button-small session-signout" type="button" onClick={cerrarSesion} disabled={cerrando}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4M8 12h10" /></svg>
+        <span>{cerrando ? "Saliendo…" : "Cerrar sesión"}</span>
+      </button>
     </div>
   ) : <span className="topbar-status">Conectando sesión…</span>;
 }

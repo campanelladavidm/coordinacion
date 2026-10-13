@@ -145,7 +145,7 @@ export default function UsuariosPage() {
               </div>
               <label className="form-field m-0">Nombre<input key={`${usuario.id}-nombre-${usuario.nombre}`} defaultValue={usuario.nombre} maxLength={100} onBlur={(event) => { const value = event.target.value.trim(); if (value && value !== usuario.nombre) void actualizar(usuario, { nombre: value }); }} /></label>
               <label className="form-field m-0">Rol<select value={usuario.rolId} disabled={guardandoId === usuario.id || !usuario.rolId} onChange={(event) => void actualizar(usuario, { rolId: event.target.value })}>{roles.map((rol) => <option key={rol.id} value={rol.id}>{rol.nombre}</option>)}</select></label>
-              <div className="flex flex-wrap gap-2 md:justify-self-end">
+              <div className="flex flex-wrap gap-2 md:translate-y-6 md:justify-self-end">
               <button className={"button button-small " + (usuario.activo ? "border-rose-900/70 text-rose-300" : "border-emerald-800/70 text-emerald-300")} type="button" disabled={guardandoId === usuario.id} onClick={() => {
                 const accion = usuario.activo ? "desactivar" : "activar";
                 if (window.confirm(`¿Querés ${accion} la cuenta de ${usuario.nombre || usuario.email}?`)) void actualizar(usuario, { activo: !usuario.activo });

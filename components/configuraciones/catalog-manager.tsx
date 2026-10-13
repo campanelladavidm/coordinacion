@@ -35,7 +35,9 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const opciones = catalogos[tipo] as CatalogOption[];
+  const todasLasOpciones = catalogos[tipo] as CatalogOption[];
+  const opciones = todasLasOpciones.filter((opcion) => opcion.activo !== false);
+  const tercerizadasActivas = catalogos.tercerizadas.filter((empresa) => empresa.activo !== false);
   const puedeGestionar = rolDemo === "SUPERVISOR" || rolDemo === "JEFE";
   const esCuadrilla = tipo === "cuadrillas";
   const esTercerizada = tipo === "tercerizadas";
@@ -84,7 +86,8 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
           : { ...opcion, nombre: nombreLimpio };
       });
     } else {
-      const nueva = { id: crearId(), nombre: nombreLimpio };
+      const archivada = todasLasOpciones.find((opcion) => opcion.activo === false && compararTexto(opcion.nombre) === compararTexto(nombreLimpio));
+      const nueva = archivada ? { ...archivada, nombre: nombreLimpio, activo: true } : { id: crearId(), nombre: nombreLimpio, activo: true };
       siguientes = esCuadrilla ? [...opciones, { ...nueva, tercerizadaId } as CuadrillaCatalogo] : [...opciones, nueva];
     }
     setGuardando(true);
@@ -116,54 +119,45 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
   }
 
   async function eliminar(opcion: CatalogOption) {
-    const uso = referencias(opcion.id);
-    if (uso > 0) {
-      setMensaje(`No se puede eliminar “${opcion.nombre}”: tiene ${uso} referencia${uso === 1 ? "" : "s"} en uso.`);
-      return;
-    }
-    if (esTercerizada && catalogos.cuadrillas.some((cuadrilla) => cuadrilla.tercerizadaId === opcion.id)) {
-      setMensaje("Primero reasigná o eliminá las cuadrillas de esta tercerizada.");
-      return;
-    }
     setGuardando(true);
+    setMensaje("");
     try {
       await guardarOpciones(opciones.filter((actual) => actual.id !== opcion.id));
       if (editandoId === opcion.id) cancelarEdicion();
-      setMensaje("Elemento eliminado.");
+      setMensaje("Elemento eliminado del catálogo. Los registros anteriores conservan sus referencias.");
     } catch (cause) {
       setMensaje(cause instanceof Error ? cause.message : "No se pudo eliminar el elemento.");
     } finally {
       setGuardando(false);
     }
   }
-
   function fila(opcion: CatalogOption) {
     const uso = referencias(opcion.id);
     const empresa = esCuadrilla
       ? catalogos.tercerizadas.find((item) => item.id === (opcion as CuadrillaCatalogo).tercerizadaId)?.nombre
       : undefined;
-    const bloquearEliminacion = uso > 0 || (esTercerizada && catalogos.cuadrillas.some((item) => item.tercerizadaId === opcion.id));
+
     return (
       <li className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-slate-700/80 bg-slate-950/30 px-4 py-3" key={opcion.id}>
         <div className="min-w-0">
           <strong className={`block truncate text-sm font-medium text-slate-200 ${esCuadrilla || esTercerizada ? "uppercase tracking-wide" : ""}`}>{opcion.nombre}</strong>
           {empresa && <span className="mt-1 block text-xs text-slate-400">{empresa}</span>}
-          {esTercerizada && <span className="mt-1 block text-xs text-slate-400">{catalogos.cuadrillas.filter((item) => item.tercerizadaId === opcion.id).length} cuadrillas</span>}
+          {esTercerizada && <span className="mt-1 block text-xs text-slate-400">{cuadrillas.filter((item) => item.tercerizadaId === opcion.id).length} cuadrillas</span>}
           {uso > 0 && <span className="mt-1 block text-xs text-slate-500">En uso: {uso}</span>}
         </div>
         {puedeGestionar && (
           <div className="flex shrink-0 gap-2">
             <button className="button button-small" type="button" disabled={guardando} onClick={() => editar(opcion)}>Editar</button>
-            <button className="button button-small border-rose-900/70 text-rose-300 disabled:cursor-not-allowed disabled:opacity-40" type="button" disabled={bloquearEliminacion || guardando} title={bloquearEliminacion ? "No se puede eliminar mientras tenga referencias" : "Eliminar elemento"} onClick={() => void eliminar(opcion)}>Eliminar</button>
+            <button className="button button-small border-rose-900/70 text-rose-300 disabled:cursor-not-allowed disabled:opacity-40" type="button" disabled={guardando} title="Quitar este elemento de las opciones activas" onClick={() => void eliminar(opcion)}>Eliminar</button>
           </div>
         )}
       </li>
     );
   }
 
-  const cuadrillas = catalogos.cuadrillas;
+  const cuadrillas = catalogos.cuadrillas.filter((cuadrilla) => cuadrilla.activo !== false);
   return (
-    <div className="grid max-w-5xl gap-4">
+    <div className="catalog-manager grid gap-4">
       {puedeGestionar ? (
         <form className="panel grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(180px,0.7fr)_auto] sm:items-end" onSubmit={guardar}>
           <label className="form-field mt-0">{editandoId ? "Editar nombre" : "Nuevo elemento"}
@@ -173,7 +167,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
             <label className="form-field mt-0">Tercerizada *
               <select value={tercerizadaId} onChange={(event) => setTercerizadaId(event.target.value)} required>
                 <option value="">Seleccionar tercerizada</option>
-                {catalogos.tercerizadas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}
+                {tercerizadasActivas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}
               </select>
             </label>
           ) : <span className="hidden sm:block" />}
@@ -187,7 +181,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
         <p className="m-0 rounded-lg border border-slate-700/70 bg-slate-900/50 px-4 py-3 text-xs text-slate-400">La edición de catálogos está disponible para Supervisor y Jefe.</p>
       )}
 
-      {esCuadrilla ? catalogos.tercerizadas.map((empresa) => {
+      {esCuadrilla ? tercerizadasActivas.map((empresa) => {
         const deEmpresa = cuadrillas.filter((item) => item.tercerizadaId === empresa.id);
         return (
           <section className="panel overflow-hidden" key={empresa.id}>

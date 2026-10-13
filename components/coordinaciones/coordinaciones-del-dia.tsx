@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState, type DragEvent, type FormEvent } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
+import { NuevaCoordinacionDialog } from "@/components/coordinaciones/nueva-coordinacion-dialog";
+import type { NuevaCoordinacionDefaults } from "@/components/coordinaciones/nueva-coordinacion-form";
 import { nombreDe } from "@/lib/demo-data/catalogs";
 import { normalizarUbicacionMaps } from "@/lib/maps/ubicacion";
 import {
@@ -16,11 +18,19 @@ function porcentaje(cantidad: number, total: number) {
   return total === 0 ? 0 : Math.round((cantidad / total) * 100);
 }
 
+function claseAvanceRango(casos: number, pedidos: number) {
+  if (pedidos === 0) return casos === 0 ? "state-rango-verde" : "state-rango-rojo";
+  const proporcion = casos / pedidos;
+  if (proporcion < 0.5) return "state-rango-rojo";
+  if (proporcion < 0.75) return "state-rango-amarillo";
+  return "state-rango-verde";
+}
+
 function normalizarBusqueda(valor: string) {
   return valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
 }
 
-function DetalleCoordinacion({ coordinacion, fecha }: { coordinacion: Coordinacion; fecha: string }) {
+function DetalleCoordinacion({ coordinacion, onEditar }: { coordinacion: Coordinacion; onEditar: () => void }) {
   const { catalogos } = useCoordinacionesDemo();
   return (
     <div className="coordination-detail">
@@ -30,7 +40,7 @@ function DetalleCoordinacion({ coordinacion, fecha }: { coordinacion: Coordinaci
       <div><span>Estado</span><strong>{nombreDe(catalogos.estados, coordinacion.estadoId)}</strong></div>
       <div><span>Observaciones</span><strong>{coordinacion.observaciones || "Sin observaciones"}</strong></div>
       <div><span>Extras</span><strong>{coordinacion.extrasIds.length ? coordinacion.extrasIds.map((id) => nombreDe(catalogos.extras, id)).join(", ") : "Sin extras"}</strong></div>
-      <div className="coordination-detail-actions"><Link className="button button-small" href={"/coordinaciones/" + fecha + "/editar/" + coordinacion.id}>Editar coordinación</Link></div>
+      <div className="coordination-detail-actions"><button className="button button-small" type="button" onClick={onEditar}>Editar coordinación</button></div>
     </div>
   );
 }
@@ -69,7 +79,7 @@ function CustodiasDialog({ fecha, onClose }: { fecha: string; onClose: () => voi
         <div className="modal-heading"><div><p className="eyebrow">Solicitud del día</p><h2 id="custodias-title" className="modal-title">Custodias - Policías</h2></div><button className="modal-close" type="button" aria-label="Cerrar" onClick={onClose}>×</button></div>
         <p className="page-description">Elegí una cuadrilla, el horario de retiro y uno o ambos tipos de solicitud.</p>
         <form onSubmit={guardar}>
-          <label className="form-field">Cuadrilla *<select name="cuadrilla" required defaultValue=""><option value="">Seleccionar cuadrilla…</option>{catalogos.cuadrillas.map((cuadrilla) => <option key={cuadrilla.id} value={cuadrilla.id}>{catalogos.tercerizadas.find((empresa) => empresa.id === cuadrilla.tercerizadaId)?.nombre ?? "Sin tercerizada"} · {cuadrilla.nombre}</option>)}</select></label>
+          <label className="form-field">Cuadrilla *<select name="cuadrilla" required defaultValue=""><option value="">Seleccionar cuadrilla…</option>{catalogos.cuadrillas.filter((cuadrilla) => cuadrilla.activo !== false).map((cuadrilla) => <option key={cuadrilla.id} value={cuadrilla.id}>{catalogos.tercerizadas.find((empresa) => empresa.id === cuadrilla.tercerizadaId)?.nombre ?? "Sin tercerizada"} · {cuadrilla.nombre}</option>)}</select></label>
           <label className="form-field">Horario de retiro *<input name="horario" type="text" required placeholder="Escribí el horario de retiro" /></label>
           <fieldset className="extras-fieldset"><legend>Tipo de solicitud *</legend><div className="extras-options">
             <label className="extra-option"><input type="checkbox" checked={tipos.includes("CUSTODIA")} onChange={(event) => cambiarTipo("CUSTODIA", event.target.checked)} />Custodia</label>
@@ -83,12 +93,84 @@ function CustodiasDialog({ fecha, onClose }: { fecha: string; onClose: () => voi
   );
 }
 
+type RangoFormRow = { cuadrillaId: string; cantidadTickets: number | null; noTrabaja: boolean };
+
+function RangoDialog({ fecha, onClose }: { fecha: string; onClose: () => void }) {
+  const { catalogos, rangos, errorRangos, guardarRangos } = useCoordinacionesDemo();
+  const cuadrillasActivas = catalogos.cuadrillas.filter((cuadrilla) => cuadrilla.activo !== false);
+  const [filas, setFilas] = useState<RangoFormRow[]>(() => cuadrillasActivas.map((cuadrilla) => {
+    const existente = rangos.find((rango) => rango.fecha === fecha && rango.cuadrillaId === cuadrilla.id);
+    return {
+      cuadrillaId: cuadrilla.id,
+      cantidadTickets: existente?.cantidadTickets ?? null,
+      noTrabaja: existente?.noTrabaja ?? false,
+    };
+  }));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  function actualizarFila(cuadrillaId: string, cambios: Partial<RangoFormRow>) {
+    setFilas((actuales) => actuales.map((fila) => fila.cuadrillaId === cuadrillaId ? { ...fila, ...cambios } : fila));
+  }
+
+  async function guardar(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (errorRangos) return;
+    if (filas.length === 0) {
+      setError("No hay cuadrillas activas para cargar.");
+      return;
+    }
+    if (filas.some((fila) => !fila.noTrabaja && fila.cantidadTickets !== null && (!Number.isInteger(fila.cantidadTickets) || fila.cantidadTickets < 0))) {
+      setError("La cantidad debe ser un número entero igual o mayor que cero.");
+      return;
+    }
+    setGuardando(true);
+    setError("");
+    try {
+      await guardarRangos(fecha, filas);
+      onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo guardar el rango.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop rango-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="panel modal-card rango-modal-card" role="dialog" aria-modal="true" aria-labelledby="rango-title">
+        <div className="modal-heading"><div><p className="eyebrow">Planificación del día</p><h2 id="rango-title" className="modal-title">Rango de cuadrillas</h2></div><button className="modal-close" type="button" aria-label="Cerrar" onClick={onClose}>×</button></div>
+        <p className="page-description">Ingresá la cantidad de tickets de cada cuadrilla. Si no trabaja, marcá esa opción.</p>
+        {errorRangos && <p role="alert" className="rango-error">{errorRangos}</p>}
+        <form onSubmit={guardar}>
+          {filas.length === 0 ? <p className="rango-empty">No hay cuadrillas activas para cargar.</p> : <div className="rango-list">
+            {filas.map((fila) => {
+              const cuadrilla = catalogos.cuadrillas.find((item) => item.id === fila.cuadrillaId);
+              return <div className="rango-row" key={fila.cuadrillaId}>
+                <span className="rango-crew-name"><small>{catalogos.tercerizadas.find((empresa) => empresa.id === cuadrilla?.tercerizadaId)?.nombre ?? "Sin tercerizada"}</small><strong>{cuadrilla?.nombre ?? "Cuadrilla"}</strong></span>
+                <label className="rango-count-field">Tickets<input type="number" min="0" step="1" value={fila.noTrabaja ? "" : fila.cantidadTickets ?? ""} disabled={fila.noTrabaja || Boolean(errorRangos)} onChange={(event) => actualizarFila(fila.cuadrillaId, { cantidadTickets: event.target.value === "" ? null : Number(event.target.value) })} aria-label={`Cantidad de tickets para ${cuadrilla?.nombre ?? "cuadrilla"}`} /></label>
+                <label className="rango-no-trabaja"><input type="checkbox" checked={fila.noTrabaja} disabled={Boolean(errorRangos)} onChange={(event) => actualizarFila(fila.cuadrillaId, { noTrabaja: event.target.checked, cantidadTickets: event.target.checked ? null : fila.cantidadTickets })} />No trabaja</label>
+              </div>;
+            })}
+          </div>}
+          {error && <p role="alert" className="rango-error">{error}</p>}
+          <div className="form-actions"><button className="button" type="button" onClick={onClose}>Cancelar</button><button className="button button-primary" type="submit" disabled={guardando || Boolean(errorRangos) || filas.length === 0}>{guardando ? "Guardando…" : "Guardar rango"}</button></div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; tituloFecha: string }) {
-  const { coordinaciones, custodias, catalogos, ready, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, eliminarSolicitudCustodia } = useCoordinacionesDemo();
+  const { coordinaciones, custodias, rangos, catalogos, ready, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, eliminarSolicitudCustodia } = useCoordinacionesDemo();
   const nombreTercerizada = (id: string | null) => catalogos.tercerizadas.find((opcion) => opcion.id === id)?.nombre ?? "Sin tercerizada";
   const nombreCuadrilla = (id: string | null) => catalogos.cuadrillas.find((opcion) => opcion.id === id)?.nombre ?? "Sin cuadrilla asignada";
   const [abierta, setAbierta] = useState<string | null>(null);
   const [mostrarCustodias, setMostrarCustodias] = useState(false);
+  const [mostrarRango, setMostrarRango] = useState(false);
+  const [mostrarNuevaCoordinacion, setMostrarNuevaCoordinacion] = useState(false);
+  const [coordinacionEditandoModal, setCoordinacionEditandoModal] = useState<string | null>(null);
+  const [valoresNuevaCoordinacion, setValoresNuevaCoordinacion] = useState<NuevaCoordinacionDefaults | undefined>(undefined);
   const [busqueda, setBusqueda] = useState("");
   const [cuadrillaCopiada, setCuadrillaCopiada] = useState<string | null>(null);
   const [errorEstado, setErrorEstado] = useState("");
@@ -234,8 +316,9 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
         {metrics.map((metric) => <article key={metric.label} className="panel metric-card"><div className="metric-label">{metric.label}</div><div className="metric-value">{ready ? metric.value : "…"}</div><div className="metric-percent">{ready ? porcentaje(metric.value, delDia.length) + "% del total" : "Cargando"}</div></article>)}
       </div>
       <div className="button-row">
+        <button className="button button-primary" type="button" disabled={!ready} onClick={() => setMostrarRango(true)}>Rango</button>
         <button className="button button-primary" type="button" onClick={() => setMostrarCustodias(true)}>Custodias - Policías</button>
-        <Link className="button button-primary" href={"/coordinaciones/" + fecha + "/nueva"}>＋ Cargar coordinación nueva</Link>
+        <button className="button button-primary button-create-coordination" type="button" onClick={() => setMostrarNuevaCoordinacion(true)}>＋ Cargar coordinación nueva</button>
       </div>
       {errorEstado && <p className="text-sm text-rose-300" role="alert">{errorEstado}</p>}
       {errorMapa && <p className="text-sm text-amber-200" role="status">{errorMapa}</p>}
@@ -260,6 +343,19 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
               <h3 className="company-heading">{nombreTercerizada(tercerizadaId === "sin-tercerizada" ? null : tercerizadaId)}<span>{[...cuadrillasDeTercerizada.values()].reduce((suma, items) => suma + items.length, 0)}</span></h3>
               {[...cuadrillasDeTercerizada.entries()].map(([cuadrillaId, items]) => {
                 const itemsOrdenados = [...items].sort((a, b) => a.orden - b.orden);
+                const cuadrillaRealId = cuadrillaId === "sin-cuadrilla" ? null : cuadrillaId;
+                const casosCoordinados = delDia.filter((item) => item.cuadrillaId === cuadrillaRealId && (item.tercerizadaId ?? "sin-tercerizada") === tercerizadaId).length;
+                const rango = rangos.find((item) => item.fecha === fecha && item.cuadrillaId === cuadrillaId);
+                const pedidosEsperados = rango ? (rango.noTrabaja ? 0 : rango.cantidadTickets) : null;
+                const revisarRango = pedidosEsperados === 0 && casosCoordinados > 0;
+                const estadoAvanceRango = pedidosEsperados !== null ? claseAvanceRango(casosCoordinados, pedidosEsperados) : "";
+                const coloresAvanceRango = revisarRango
+                  ? { borderColor: "#ff5263", backgroundColor: "#591d27", color: "#ffd9de" }
+                  : estadoAvanceRango === "state-rango-rojo"
+                  ? { borderColor: "#704148", backgroundColor: "#3e272d", color: "#e9b4bb" }
+                  : estadoAvanceRango === "state-rango-amarillo"
+                    ? { borderColor: "#75572e", backgroundColor: "#3a2d1e", color: "#e8c98f" }
+                    : { borderColor: "#246c60", backgroundColor: "#123e3a", color: "#a9ead4" };
                 return <div key={cuadrillaId} className="crew-group">
                   <h4 className="crew-heading">
                     <div className="crew-name-copy">
@@ -270,6 +366,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
                       <button className="copy-tickets-button map-route-button" type="button" onClick={() => abrirRecorrido(itemsOrdenados)} aria-label={`Abrir recorrido en Google Maps para ${nombreCuadrilla(cuadrillaId === "sin-cuadrilla" ? null : cuadrillaId)}`} title="Abrir recorrido ordenado en Google Maps">
                         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8.2c0 4.4-6 9-6 9s-6-4.6-6-9a6 6 0 1 1 12 0Z" /><circle cx="10" cy="8" r="2" /></svg>
                       </button>
+                      {pedidosEsperados !== null && <span className={`state-badge rango-progress-badge ${estadoAvanceRango}${revisarRango ? " state-rango-revisar" : ""}`} style={coloresAvanceRango}>{revisarRango ? "Revisar rango" : `${casosCoordinados} casos de ${pedidosEsperados} pedidos`}</span>}
                     </div>
                     <span className="crew-heading-meta">
                       {Array.from(new Set(items.flatMap((item) => item.extrasIds))).map((extraId) => <span key={extraId} className="crew-extra-indicator">{nombreDe(catalogos.extras, extraId)}</span>)}
@@ -282,7 +379,15 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
                         <button className="custody-delete-button coordination-delete-button" type="button" disabled={eliminandoCoordinacion === coordinacion.id} title="Eliminar coordinación" aria-label={`Eliminar coordinación ${coordinacion.ticket}`} onClick={() => void eliminarCaso(coordinacion)}>
                           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3.5h6M4.5 5.5h11m-9.5 0 .65 11h6.7l.65-11M8 8.5v5m4-5v5" /></svg>
                         </button>
-                        <button type="button" className="coordination-summary" aria-expanded={abierta === coordinacion.id} onClick={() => setAbierta(abierta === coordinacion.id ? null : coordinacion.id)} onDoubleClick={(event) => {
+                        <div role="button" tabIndex={0} className="coordination-summary" aria-expanded={abierta === coordinacion.id} onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          setAbierta(abierta === coordinacion.id ? null : coordinacion.id);
+                        }} onClick={(event) => {
+                          const target = event.target as HTMLElement;
+                          if (target.closest(".coordination-ticket") && window.getSelection()?.toString()) return;
+                          setAbierta(abierta === coordinacion.id ? null : coordinacion.id);
+                        }} onDoubleClick={(event) => {
                           if (!(event.target as HTMLElement).closest(".state-badge")) return;
                           event.preventDefault();
                           event.stopPropagation();
@@ -297,12 +402,12 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
                             });
                           }
                         }}>
-                          <span className="coordination-ticket-cell"><span className="coordination-drag-handle" draggable={!termino && !guardandoOrden} title="Arrastrá para reordenar" aria-label="Arrastrar para reordenar">⠿</span><span className="coordination-ticket">{coordinacion.ticket}</span></span>
+                          <span className="coordination-ticket-cell"><span className="coordination-drag-handle" draggable={!termino && !guardandoOrden} title="Arrastrá para reordenar" aria-label="Arrastrar para reordenar">⠿</span><span className="coordination-ticket" title="Seleccioná el número para copiarlo">{coordinacion.ticket}</span></span>
                           <span className="coordination-meta"><span>{nombreDe(catalogos.tecnologias, coordinacion.tecnologiaId)}</span><span>{coordinacion.zona ? nombreDe(catalogos.zonas, coordinacion.zona) : "Zona sin asignar"}</span></span>
                           <span className={"state-badge state-" + normalizarBusqueda(nombreDe(catalogos.estados, coordinacion.estadoId)).replace(/\s+/g, "-")} title="Doble clic para marcar como confirmado">{nombreDe(catalogos.estados, coordinacion.estadoId)}</span>
                           <span className="expand-chevron">{abierta === coordinacion.id ? "⌃" : "⌄"}</span>
-                        </button>
-                        {abierta === coordinacion.id && <DetalleCoordinacion coordinacion={coordinacion} fecha={fecha} />}
+                        </div>
+                        {abierta === coordinacion.id && <DetalleCoordinacion coordinacion={coordinacion} onEditar={() => setCoordinacionEditandoModal(coordinacion.id)} />}
                       </article>
                     ))}
                   </div>
@@ -313,6 +418,9 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
         </div>
       )}
       {mostrarCustodias && <CustodiasDialog fecha={fecha} onClose={() => setMostrarCustodias(false)} />} 
+      {mostrarRango && <RangoDialog fecha={fecha} onClose={() => setMostrarRango(false)} />}
+      {mostrarNuevaCoordinacion && <NuevaCoordinacionDialog fecha={fecha} valoresIniciales={valoresNuevaCoordinacion} onClose={() => setMostrarNuevaCoordinacion(false)} onGuardado={setValoresNuevaCoordinacion} />}
+      {coordinacionEditandoModal && <NuevaCoordinacionDialog fecha={fecha} coordinacionId={coordinacionEditandoModal} onClose={() => setCoordinacionEditandoModal(null)} />}
     </section>
   );
 }

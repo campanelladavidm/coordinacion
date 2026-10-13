@@ -69,7 +69,7 @@ export default function FeriadosPage() {
   }
 
   return (
-    <section>
+    <section className="settings-page">
       <Link href="/configuraciones" className="back-link">&larr; Volver a configuraciones</Link>
       <PageHeading eyebrow="Configuración" title="Feriados y personal interno" description="Marcá los feriados y asigná el personal interno que trabajará cada día." />
       {!puedeGestionar ? <EmptyState title="Acceso restringido" description="Solo los roles Supervisor y Jefe pueden administrar feriados y asignaciones." /> : (

@@ -30,6 +30,10 @@ export type Database = {
         { id: string; fecha: string; tipo: "CUSTODIA" | "POLICIA"; cuadrilla_id: string; horario_retiro_id: string | null; horario_retiro: string; observaciones: string | null; creado_por: string | null; created_at: string },
         { id?: string; fecha: string; tipo: "CUSTODIA" | "POLICIA"; cuadrilla_id: string; horario_retiro_id?: string | null; horario_retiro: string; observaciones?: string | null; creado_por?: string | null; created_at?: string }
       >;
+      rangos_cuadrilla: Table<
+        { fecha: string; cuadrilla_id: string; cantidad_tickets: number | null; no_trabaja: boolean; actualizado_por: string | null; created_at: string; updated_at: string },
+        { fecha: string; cuadrilla_id: string; cantidad_tickets: number | null; no_trabaja?: boolean; actualizado_por?: string | null; created_at?: string; updated_at?: string }
+      >;
       personal_interno: Table<CatalogRow, CatalogInsert>;
       feriados: Table<{ fecha: string; es_feriado: boolean; creado_por: string | null; created_at: string; updated_at: string }, { fecha: string; es_feriado?: boolean; creado_por?: string | null }>;
       feriado_personal: Table<{ fecha: string; personal_id: string; orden: number }, { fecha: string; personal_id: string; orden?: number }>;

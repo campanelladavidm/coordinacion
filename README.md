@@ -17,6 +17,11 @@ En un proyecto Supabase nuevo, abrí **SQL Editor** y ejecutá en este orden:
 
 1. `supabase/migrations/202610070001_initial_schema.sql`
 2. `supabase/migrations/202610080002_shared_catalogs_notes_holidays.sql`
+3. `supabase/migrations/202610090001_orden_coordinaciones.sql`
+4. `supabase/migrations/202610090002_ubicacion_coordinaciones.sql`
+5. `supabase/migrations/202610120001_rangos_cuadrillas.sql`
+
+Si la base ya estaba instalada antes del mÃ³dulo Rango, ejecutÃ¡ solamente `202610120001_rangos_cuadrillas.sql` una vez desde SQL Editor.
 
 Las migraciones crean el esquema relacional, catálogos iniciales, zonas y cuadrillas conocidas, perfiles, políticas RLS, notas del equipo y feriados con asignaciones de personal. La segunda migración conserva los datos anteriores y añade el horario de retiro de custodias como texto libre.
 

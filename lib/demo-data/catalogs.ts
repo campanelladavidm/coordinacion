@@ -1,4 +1,4 @@
-export type CatalogOption = { id: string; nombre: string };
+export type CatalogOption = { id: string; nombre: string; activo?: boolean };
 
 export const tercerizadas: CatalogOption[] = [
   { id: "atinet", nombre: "Atinet" },

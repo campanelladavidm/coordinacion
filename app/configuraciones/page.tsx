@@ -19,11 +19,11 @@ const catalogs = [
 export default function ConfiguracionesPage() {
   const { catalogos } = useCoordinacionesDemo();
   return (
-    <section>
+    <section className="settings-page">
       <PageHeading eyebrow="Administración" title="Configuraciones" description="Catálogos que se utilizarán al cargar y organizar coordinaciones." />
       <div className="catalog-grid">
         {catalogs.map((catalog) => {
-          const cantidad = "quantity" in catalog ? catalogos[catalog.quantity].length : null;
+          const cantidad = "quantity" in catalog ? catalogos[catalog.quantity].filter((opcion) => opcion.activo !== false).length : null;
           const detalle = cantidad === null ? catalog.label : `${cantidad} ${catalog.label}`;
           return (
             <Link key={catalog.slug} className="catalog-link" href={`/configuraciones/${catalog.slug}`}>

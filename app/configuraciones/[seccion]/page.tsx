@@ -24,10 +24,10 @@ export default function CatalogoPage({ params }: { params: Promise<PageParams> }
 async function CatalogoContenido({ params }: { params: Promise<PageParams> }) {
   const { seccion } = await params;
   const catalogo = catalogos[seccion as CatalogoKey];
-  if (!catalogo) return <section><Link href="/configuraciones" className="back-link">← Volver a configuraciones</Link><PageHeading eyebrow="Configuración" title="Catálogo no encontrado" description="Elegí un catálogo disponible en Configuraciones." /></section>;
+  if (!catalogo) return <section className="settings-page"><Link href="/configuraciones" className="back-link">← Volver a configuraciones</Link><PageHeading eyebrow="Configuración" title="Catálogo no encontrado" description="Elegí un catálogo disponible en Configuraciones." /></section>;
 
   return (
-    <section>
+    <section className="settings-page">
       <Link href="/configuraciones" className="back-link">← Volver a configuraciones</Link>
       <PageHeading eyebrow="Catálogo" title={catalogo.nombre} description={catalogo.descripcion} />
       <CatalogManager tipo={seccion as CatalogoKey} />
