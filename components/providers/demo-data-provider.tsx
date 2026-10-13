@@ -38,6 +38,7 @@ type DemoContextValue = {
   ready: boolean; error: string | null;
   crearCoordinacion: (coordinacion: NuevaCoordinacion) => Promise<void>;
   actualizarCoordinacion: (id: string, coordinacion: NuevaCoordinacion) => Promise<void>;
+  moverCoordinacion: (id: string, tercerizadaId: string | null, cuadrillaId: string | null) => Promise<void>;
   eliminarCoordinacion: (id: string) => Promise<void>;
   reordenarCoordinaciones: (ids: string[]) => Promise<void>;
   crearSolicitudCustodia: (solicitud: NuevaSolicitudCustodia) => Promise<void>;
@@ -235,6 +236,23 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     setCoordinaciones((actuales) => actuales.map((item) => item.id === id ? { ...actualizacion, id, orden } : item));
   }, [coordinaciones]);
 
+  const moverCoordinacion = useCallback(async (id: string, tercerizadaId: string | null, cuadrillaId: string | null) => {
+    const anterior = coordinaciones.find((item) => item.id === id);
+    if (!anterior) throw new Error("No se encontró la coordinación que querés mover.");
+    const orden = coordinaciones
+      .filter((item) => item.id !== id && item.fecha === anterior.fecha && item.tercerizadaId === tercerizadaId && item.cuadrillaId === cuadrillaId)
+      .reduce((mayor, item) => Math.max(mayor, item.orden), -1) + 1;
+    const supabase = createClient();
+    const { data, error: moverError } = await supabase.from("coordinaciones")
+      .update({ tercerizada_id: tercerizadaId, cuadrilla_id: cuadrillaId, orden })
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
+    lanzarError(moverError);
+    if (!data) throw new Error("No se encontró la coordinación o no tenés permiso para moverla.");
+    setCoordinaciones((actuales) => actuales.map((item) => item.id === id ? { ...item, tercerizadaId, cuadrillaId, orden } : item));
+  }, [coordinaciones]);
+
   const eliminarCoordinacion = useCallback(async (id: string) => {
     const supabase = createClient();
     const { data, error: deleteError } = await supabase.from("coordinaciones").delete().eq("id", id).select("id").maybeSingle();
@@ -276,19 +294,28 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) throw new Error("Iniciá sesión para guardar el rango.");
-    const filasParaGuardar = filas.map((fila) => ({
+    const filasConfiguradas = filas.filter((fila) => fila.noTrabaja || fila.cantidadTickets !== null);
+    const filasSinRango = filas.filter((fila) => !fila.noTrabaja && fila.cantidadTickets === null);
+    const filasParaGuardar = filasConfiguradas.map((fila) => ({
       fecha,
       cuadrilla_id: fila.cuadrillaId,
-      cantidad_tickets: fila.noTrabaja ? null : fila.cantidadTickets ?? 0,
+      cantidad_tickets: fila.noTrabaja ? null : fila.cantidadTickets,
       no_trabaja: fila.noTrabaja,
       actualizado_por: auth.user.id,
     }));
-    const { error: guardarError } = await supabase.from("rangos_cuadrilla").upsert(filasParaGuardar, { onConflict: "fecha,cuadrilla_id" });
-    lanzarError(guardarError);
+    if (filasParaGuardar.length > 0) {
+      const { error: guardarError } = await supabase.from("rangos_cuadrilla").upsert(filasParaGuardar, { onConflict: "fecha,cuadrilla_id" });
+      lanzarError(guardarError);
+    }
+    const idsSinRango = filasSinRango.map((fila) => fila.cuadrillaId);
+    if (idsSinRango.length > 0) {
+      const { error: eliminarError } = await supabase.from("rangos_cuadrilla").delete().eq("fecha", fecha).in("cuadrilla_id", idsSinRango);
+      lanzarError(eliminarError);
+    }
     const idsActualizados = new Set(filas.map((fila) => fila.cuadrillaId));
     setRangos((actuales) => [
       ...actuales.filter((rango) => rango.fecha !== fecha || !idsActualizados.has(rango.cuadrillaId)),
-      ...filas.map((fila) => ({ ...fila, cantidadTickets: fila.noTrabaja ? null : fila.cantidadTickets ?? 0, fecha })),
+      ...filasConfiguradas.map((fila) => ({ ...fila, cantidadTickets: fila.noTrabaja ? null : fila.cantidadTickets, fecha })),
     ]);
     setErrorRangos(null);
   }, []);
@@ -384,10 +411,10 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, usuarioActual,
-    ready, error, crearCoordinacion, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
+    ready, error, crearCoordinacion, actualizarCoordinacion, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
     guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo,
   }), [coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, usuarioActual, ready, error,
-    crearCoordinacion, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
+    crearCoordinacion, actualizarCoordinacion, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
 }

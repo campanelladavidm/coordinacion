@@ -162,7 +162,7 @@ function RangoDialog({ fecha, onClose }: { fecha: string; onClose: () => void })
 }
 
 export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; tituloFecha: string }) {
-  const { coordinaciones, custodias, rangos, catalogos, ready, actualizarCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, eliminarSolicitudCustodia } = useCoordinacionesDemo();
+  const { coordinaciones, custodias, rangos, catalogos, ready, actualizarCoordinacion, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, eliminarSolicitudCustodia } = useCoordinacionesDemo();
   const nombreTercerizada = (id: string | null) => catalogos.tercerizadas.find((opcion) => opcion.id === id)?.nombre ?? "Sin tercerizada";
   const nombreCuadrilla = (id: string | null) => catalogos.cuadrillas.find((opcion) => opcion.id === id)?.nombre ?? "Sin cuadrilla asignada";
   const [abierta, setAbierta] = useState<string | null>(null);
@@ -219,19 +219,40 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
     setIdArrastrado(id);
   }
 
-  function soltarCoordinacion(event: DragEvent<HTMLElement>, objetivoId: string, items: Coordinacion[]) {
+  function soltarEnCuadrilla(event: DragEvent<HTMLElement>, tercerizadaId: string, cuadrillaId: string, items: Coordinacion[]) {
     event.preventDefault();
+    event.stopPropagation();
     const origenId = event.dataTransfer.getData("text/plain");
-    const origen = items.findIndex((item) => item.id === origenId);
-    const objetivo = items.findIndex((item) => item.id === objetivoId);
-    if (origen < 0 || objetivo < 0 || origen === objetivo || guardandoOrden) return;
-    const ordenadas = [...items];
-    const [movida] = ordenadas.splice(origen, 1);
-    ordenadas.splice(objetivo, 0, movida);
-    setErrorOrden("");
+    const coordinacion = delDia.find((item) => item.id === origenId);
+    setIdArrastrado(null);
+    if (!coordinacion || guardandoOrden) return;
+    const tercerizadaOrigen = coordinacion.tercerizadaId ?? "sin-tercerizada";
+    const cuadrillaOrigen = coordinacion.cuadrillaId ?? "sin-cuadrilla";
+    const mismaCuadrilla = tercerizadaOrigen === tercerizadaId && cuadrillaOrigen === cuadrillaId;
     setGuardandoOrden(true);
-    void reordenarCoordinaciones(ordenadas.map((item) => item.id))
-      .catch((cause) => setErrorOrden(cause instanceof Error ? cause.message : "No se pudo guardar el orden de los casos."))
+    if (mismaCuadrilla) {
+      const origen = items.findIndex((item) => item.id === origenId);
+      const objetivoId = (event.target as HTMLElement).closest<HTMLElement>("[data-coordinacion-id]")?.dataset.coordinacionId;
+      const objetivo = objetivoId ? items.findIndex((item) => item.id === objetivoId) : items.length;
+      if (origen < 0 || objetivo < 0 || origen === objetivo) {
+        setGuardandoOrden(false);
+        return;
+      }
+      const ordenadas = [...items];
+      const [movida] = ordenadas.splice(origen, 1);
+      ordenadas.splice(objetivo, 0, movida);
+      setErrorOrden("");
+      setErrorCoordinacion("");
+      void reordenarCoordinaciones(ordenadas.map((item) => item.id))
+        .catch((cause) => setErrorOrden(cause instanceof Error ? cause.message : "No se pudo guardar el orden de los casos."))
+        .finally(() => setGuardandoOrden(false));
+      return;
+    }
+
+    setErrorOrden("");
+    setErrorCoordinacion("");
+    void moverCoordinacion(origenId, tercerizadaId === "sin-tercerizada" ? null : tercerizadaId, cuadrillaId === "sin-cuadrilla" ? null : cuadrillaId)
+      .catch((cause) => setErrorCoordinacion(cause instanceof Error ? `No se pudo mover el caso: ${cause.message}` : "No se pudo mover el caso a esa cuadrilla."))
       .finally(() => setGuardandoOrden(false));
   }
 
@@ -307,6 +328,14 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
     if (!cuadrillasDeTercerizada.has(cuadrillaId)) cuadrillasDeTercerizada.set(cuadrillaId, []);
     cuadrillasDeTercerizada.get(cuadrillaId)!.push(coordinacion);
   }
+  const rangosPlanificadosDelDia = rangos.filter((rango) => rango.fecha === fecha && !rango.noTrabaja && rango.cantidadTickets !== null);
+  for (const cuadrilla of catalogos.cuadrillas) {
+    if (!rangosPlanificadosDelDia.some((rango) => rango.cuadrillaId === cuadrilla.id)) continue;
+    const tercerizadaId = cuadrilla.tercerizadaId || "sin-tercerizada";
+    if (!grupos.has(tercerizadaId)) grupos.set(tercerizadaId, new Map());
+    const cuadrillasDeTercerizada = grupos.get(tercerizadaId)!;
+    if (!cuadrillasDeTercerizada.has(cuadrilla.id)) cuadrillasDeTercerizada.set(cuadrilla.id, []);
+  }
 
   return (
     <section>
@@ -334,9 +363,9 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
 
       <div className="daily-section-heading"><h2 className="section-title">Coordinaciones del día</h2><span className="daily-count">{coordinacionesFiltradas.length} de {delDia.length} {delDia.length === 1 ? "coordinación" : "coordinaciones"}</span></div>
       <div className="daily-search" role="search"><input type="search" aria-label="Buscar coordinaciones por cualquiera de sus datos" value={busqueda} onChange={(event) => setBusqueda(event.target.value)} placeholder="Buscar coordinaciones..." />{busqueda && <button type="button" onClick={() => setBusqueda("")} aria-label="Limpiar búsqueda">×</button>}</div>
-      {delDia.length > 1 && <p className="reorder-hint">Arrastrá los casos desde el ícono de puntos para cambiar el orden dentro de la cuadrilla.{termino ? " Limpiá la búsqueda para reordenarlos." : guardandoOrden ? " Guardando orden…" : ""}</p>}
+      {delDia.length > 0 && <p className="reorder-hint">Arrastrá un caso desde el ícono de puntos para reordenarlo o moverlo a otra cuadrilla.{termino ? " Limpiá la búsqueda para habilitar el arrastre." : guardandoOrden ? " Guardando cambio…" : ""}</p>}
       {errorOrden && <p className="text-sm text-rose-300" role="alert">{errorOrden}</p>}
-      {!ready ? <EmptyState title="Cargando coordinaciones" description="Un momento, estamos preparando los datos de demostración." /> : delDia.length === 0 ? <EmptyState title="No hay coordinaciones para este día" description="Podés cargar una coordinación nueva con el botón de arriba." icon="＋" onIconClick={() => setMostrarNuevaCoordinacion(true)} iconActionLabel="Cargar coordinación nueva" /> : coordinacionesFiltradas.length === 0 ? <EmptyState title="No encontramos coincidencias" description="Probá con otro ticket, cliente, cuadrilla u otro dato de la coordinación." /> : (
+      {!ready ? <EmptyState title="Cargando coordinaciones" description="Un momento, estamos preparando los datos de demostración." /> : coordinacionesFiltradas.length === 0 && delDia.length > 0 ? <EmptyState title="No encontramos coincidencias" description="Probá con otro ticket, cliente, cuadrilla u otro dato de la coordinación." /> : delDia.length === 0 && rangosPlanificadosDelDia.length === 0 ? <EmptyState title="No hay coordinaciones para este día" description="Podés cargar una coordinación nueva con el botón de arriba." icon="＋" onIconClick={() => setMostrarNuevaCoordinacion(true)} iconActionLabel="Cargar coordinación nueva" /> : (
         <div className="daily-groups">
           {[...grupos.entries()].map(([tercerizadaId, cuadrillasDeTercerizada]) => (
             <section key={tercerizadaId} className="panel company-group">
@@ -356,26 +385,28 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
                   : estadoAvanceRango === "state-rango-amarillo"
                     ? { borderColor: "#75572e", backgroundColor: "#3a2d1e", color: "#e8c98f" }
                     : { borderColor: "#246c60", backgroundColor: "#123e3a", color: "#a9ead4" };
-                return <div key={cuadrillaId} className="crew-group">
+                return <div key={cuadrillaId} className="crew-group" onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = guardandoOrden ? "none" : "move"; }} onDrop={(event) => soltarEnCuadrilla(event, tercerizadaId, cuadrillaId, itemsOrdenados)}>
                   <h4 className="crew-heading">
                     <div className="crew-name-copy">
                       <strong>{nombreCuadrilla(cuadrillaId === "sin-cuadrilla" ? null : cuadrillaId)}</strong>
-                      <button className="copy-tickets-button" type="button" onClick={() => void copiarTickets(tercerizadaId, cuadrillaId)} aria-label={cuadrillaCopiada === cuadrillaId ? "Tickets copiados" : "Copiar tickets de esta cuadrilla"} title={cuadrillaCopiada === cuadrillaId ? "Tickets copiados" : "Copiar todos los tickets de esta cuadrilla para el día"}>
-                        {cuadrillaCopiada === cuadrillaId ? <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 10 4 4 8-8" /></svg> : <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6.5" y="6.5" width="9" height="11" rx="1.5" /><path d="M13 6V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v9A1.5 1.5 0 0 0 4.5 15H6" /></svg>}
-                      </button>
-                      <button className="copy-tickets-button map-route-button" type="button" onClick={() => abrirRecorrido(itemsOrdenados)} aria-label={`Abrir recorrido en Google Maps para ${nombreCuadrilla(cuadrillaId === "sin-cuadrilla" ? null : cuadrillaId)}`} title="Abrir recorrido ordenado en Google Maps">
-                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8.2c0 4.4-6 9-6 9s-6-4.6-6-9a6 6 0 1 1 12 0Z" /><circle cx="10" cy="8" r="2" /></svg>
-                      </button>
+                      {items.length > 0 && <>
+                        <button className="copy-tickets-button" type="button" onClick={() => void copiarTickets(tercerizadaId, cuadrillaId)} aria-label={cuadrillaCopiada === cuadrillaId ? "Tickets copiados" : "Copiar tickets de esta cuadrilla"} title={cuadrillaCopiada === cuadrillaId ? "Tickets copiados" : "Copiar todos los tickets de esta cuadrilla para el día"}>
+                          {cuadrillaCopiada === cuadrillaId ? <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 10 4 4 8-8" /></svg> : <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="6.5" y="6.5" width="9" height="11" rx="1.5" /><path d="M13 6V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v9A1.5 1.5 0 0 0 4.5 15H6" /></svg>}
+                        </button>
+                        <button className="copy-tickets-button map-route-button" type="button" onClick={() => abrirRecorrido(itemsOrdenados)} aria-label={`Abrir recorrido en Google Maps para ${nombreCuadrilla(cuadrillaId === "sin-cuadrilla" ? null : cuadrillaId)}`} title="Abrir recorrido ordenado en Google Maps">
+                          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 8.2c0 4.4-6 9-6 9s-6-4.6-6-9a6 6 0 1 1 12 0Z" /><circle cx="10" cy="8" r="2" /></svg>
+                        </button>
+                      </>}
                       {pedidosEsperados !== null && <span className={`state-badge rango-progress-badge ${estadoAvanceRango}${revisarRango ? " state-rango-revisar" : ""}`} style={coloresAvanceRango}>{revisarRango ? "Revisar rango" : `${casosCoordinados} casos de ${pedidosEsperados} pedidos`}</span>}
                     </div>
                     <span className="crew-heading-meta">
                       {Array.from(new Set(items.flatMap((item) => item.extrasIds))).map((extraId) => <span key={extraId} className="crew-extra-indicator">{nombreDe(catalogos.extras, extraId)}</span>)}
-                      <span className="crew-count">{items.length}</span>
+                      {items.length > 0 && <span className="crew-count">{items.length}</span>}
                     </span>
                   </h4>
                   <div className="coordination-list">
                     {itemsOrdenados.map((coordinacion) => (
-                      <article key={coordinacion.id} className={`coordination-item${idArrastrado === coordinacion.id ? " is-dragging" : ""}`} onDragStart={(event) => iniciarArrastre(event, coordinacion.id)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }} onDrop={(event) => soltarCoordinacion(event, coordinacion.id, itemsOrdenados)} onDragEnd={() => setIdArrastrado(null)}>
+                      <article key={coordinacion.id} data-coordinacion-id={coordinacion.id} className={`coordination-item${idArrastrado === coordinacion.id ? " is-dragging" : ""}`} onDragStart={(event) => iniciarArrastre(event, coordinacion.id)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = guardandoOrden ? "none" : "move"; }} onDragEnd={() => setIdArrastrado(null)}>
                         <button className="custody-delete-button coordination-delete-button" type="button" disabled={eliminandoCoordinacion === coordinacion.id} title="Eliminar coordinación" aria-label={`Eliminar coordinación ${coordinacion.ticket}`} onClick={() => void eliminarCaso(coordinacion)}>
                           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3.5h6M4.5 5.5h11m-9.5 0 .65 11h6.7l.65-11M8 8.5v5m4-5v5" /></svg>
                         </button>
