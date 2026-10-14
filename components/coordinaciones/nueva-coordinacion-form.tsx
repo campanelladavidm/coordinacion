@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useCoordinacionesDemo, type NuevaCoordinacion } from "@/components/providers/demo-data-provider";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
 import { esEnlaceCortoMaps, normalizarUbicacionMaps } from "@/lib/maps/ubicacion";
 
 export type NuevaCoordinacionDefaults = Pick<NuevaCoordinacion, "tercerizadaId" | "cuadrillaId" | "zona" | "tecnologiaId">;
+type BorradorCoordinacion = Record<string, string | string[]>;
 
 function Opciones({ opciones, vacio = "Seleccionar…", conservarId }: { opciones: { id: string; nombre: string; activo?: boolean }[]; vacio?: string; conservarId?: string | null }) {
   const activas = opciones.filter((opcion) => opcion.activo !== false);
@@ -19,18 +20,60 @@ function Opciones({ opciones, vacio = "Seleccionar…", conservarId }: { opcione
 
 export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales, onCancelar, onGuardado }: { fecha: string; coordinacionId?: string; valoresIniciales?: NuevaCoordinacionDefaults; onCancelar?: () => void; onGuardado?: (valores: NuevaCoordinacionDefaults) => void }) {
   const router = useRouter();
-  const { coordinaciones, catalogos, ready, crearCoordinacion, actualizarCoordinacion } = useCoordinacionesDemo();
+  const { coordinaciones, catalogos, ready, usuarioActual, usuarioEnContexto, crearCoordinacion, actualizarCoordinacion } = useCoordinacionesDemo();
   const inicial = coordinacionId ? coordinaciones.find((coordinacion) => coordinacion.id === coordinacionId) : undefined;
   const [tercerizadaEditada, setTercerizadaEditada] = useState<string | undefined>(undefined);
   const [cuadrillaEditada, setCuadrillaEditada] = useState<string | undefined>(undefined);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const formularioRef = useRef<HTMLFormElement>(null);
+  const claveBorrador = `coordi-coordinacion-borrador:${usuarioEnContexto?.id ?? usuarioActual?.id ?? "sin-usuario"}:${fecha}`;
   const tercerizadaPorDefecto = valoresIniciales?.tercerizadaId && catalogos.tercerizadas.some((item) => item.id === valoresIniciales.tercerizadaId && item.activo !== false) ? valoresIniciales.tercerizadaId : "";
   const tercerizadaSeleccionada = tercerizadaEditada ?? inicial?.tercerizadaId ?? tercerizadaPorDefecto;
   const cuadrillaPorDefecto = valoresIniciales?.cuadrillaId && catalogos.cuadrillas.some((item) => item.id === valoresIniciales.cuadrillaId && item.activo !== false) ? valoresIniciales.cuadrillaId : "";
   const cuadrillaSeleccionada = cuadrillaEditada ?? inicial?.cuadrillaId ?? cuadrillaPorDefecto;
   const cuadrillasDisponibles = catalogos.cuadrillas.filter((cuadrilla) => cuadrilla.tercerizadaId === tercerizadaSeleccionada);
   const extrasDisponibles = catalogos.extras.filter((extra) => extra.activo !== false || (inicial?.extrasIds.includes(extra.id) ?? false));
+
+  useEffect(() => {
+    const formulario = formularioRef.current;
+    if (!ready || coordinacionId || !formulario) return;
+    try {
+      const guardado = window.sessionStorage.getItem(claveBorrador);
+      if (!guardado) return;
+      const borrador = JSON.parse(guardado) as BorradorCoordinacion;
+      if (!borrador || typeof borrador !== "object" || Array.isArray(borrador)) return;
+      for (const [nombre, valor] of Object.entries(borrador)) {
+        if (nombre === "extras" || typeof valor !== "string" || nombre === "tercerizada" || nombre === "cuadrilla") continue;
+        const campo = formulario.elements.namedItem(nombre);
+        if (campo instanceof HTMLInputElement || campo instanceof HTMLSelectElement || campo instanceof HTMLTextAreaElement) campo.value = valor;
+      }
+      if (typeof borrador.tercerizada === "string") setTercerizadaEditada(borrador.tercerizada);
+      if (typeof borrador.cuadrilla === "string") setCuadrillaEditada(borrador.cuadrilla);
+      const extrasGuardados = Array.isArray(borrador.extras) ? borrador.extras : [];
+      formulario.querySelectorAll<HTMLInputElement>('input[name="extras"]').forEach((checkbox) => {
+        checkbox.checked = extrasGuardados.includes(checkbox.value);
+      });
+    } catch {
+      try { window.sessionStorage.removeItem(claveBorrador); } catch { /* El formulario puede continuar sin storage. */ }
+    }
+  }, [ready, coordinacionId, claveBorrador]);
+
+  function guardarBorrador(event: ChangeEvent<HTMLFormElement>) {
+    if (coordinacionId) return;
+    const datos = new FormData(event.currentTarget);
+    const borrador: BorradorCoordinacion = {};
+    for (const [nombre, valor] of datos.entries()) {
+      if (nombre === "extras") continue;
+      borrador[nombre] = String(valor);
+    }
+    borrador.extras = datos.getAll("extras").map(String);
+    try {
+      window.sessionStorage.setItem(claveBorrador, JSON.stringify(borrador));
+    } catch {
+      // Si el navegador bloquea el almacenamiento, el formulario sigue funcionando normalmente.
+    }
+  }
 
   if (!ready) return <EmptyState title="Cargando formulario" description="Estamos preparando las opciones de demostración." />;
   if (coordinacionId && !inicial) return <EmptyState title="No encontramos esa coordinación" description="Volvé al día seleccionado y abrí una coordinación de la lista." />;
@@ -75,6 +118,9 @@ export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales,
       };
       if (inicial) await actualizarCoordinacion(inicial.id, nueva);
       else await crearCoordinacion(nueva);
+      if (!inicial) {
+        try { window.sessionStorage.removeItem(claveBorrador); } catch { /* La coordinación ya quedó guardada. */ }
+      }
       if (onGuardado) onGuardado({ tercerizadaId: nueva.tercerizadaId, cuadrillaId: nueva.cuadrillaId, zona: nueva.zona, tecnologiaId: nueva.tecnologiaId });
       else router.push("/coordinaciones/" + nueva.fecha);
     } catch (cause) {
@@ -88,7 +134,7 @@ export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales,
     <section className={onCancelar ? "nueva-coordinacion-form-modal" : undefined}>
       {!onCancelar && (<Link href={"/coordinaciones/" + fecha} className="back-link">← Volver a las coordinaciones</Link>)}
       {!onCancelar && (<PageHeading eyebrow={inicial ? "Editar coordinación" : "Nueva coordinación"} title={inicial ? "Editar " + inicial.ticket : "Cargar coordinación"} description="Completá los datos del caso. Los campos con * son obligatorios." />)}
-      <form className="panel coordination-form" onSubmit={guardar}>
+      <form ref={formularioRef} className="panel coordination-form" onSubmit={guardar} onChange={guardarBorrador}>
         <div className="form-grid">
           <label className="form-field">Fecha *<input type="date" name="fecha" defaultValue={inicial?.fecha ?? fecha} required /></label>
           <label className="form-field">Número de ticket *<input name="ticket" required defaultValue={inicial?.ticket ?? ""} placeholder="Ej.: 1234567" /></label>
