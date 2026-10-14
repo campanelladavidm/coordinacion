@@ -38,6 +38,15 @@ export type Database = {
       feriados: Table<{ fecha: string; es_feriado: boolean; creado_por: string | null; created_at: string; updated_at: string }, { fecha: string; es_feriado?: boolean; creado_por?: string | null }>;
       feriado_personal: Table<{ fecha: string; personal_id: string; orden: number }, { fecha: string; personal_id: string; orden?: number }>;
       notas_equipo: Table<{ id: string; comentario: string; creado_por: string; created_at: string }, { id?: string; comentario: string; creado_por: string; created_at?: string }>;
+      novedades: Table<
+        { id: string; fecha: string; motivo: string; descripcion: string; tiempo_devuelto: boolean; detalle_devolucion: string | null; creado_por: string; created_at: string },
+        { id?: string; fecha: string; motivo: string; descripcion: string; tiempo_devuelto?: boolean; detalle_devolucion?: string | null; creado_por: string; created_at?: string }
+      >;
+      novedades_vistas: Table<{ novedad_id: string; jefe_id: string; revisado_at: string }, { novedad_id: string; jefe_id: string; revisado_at?: string }>;
+      actuaciones_jefe: Table<
+        { id: string; jefe_id: string | null; usuario_contexto_id: string | null; tabla: string; operacion: string; fila_id: string | null; datos_anteriores: unknown; datos_nuevos: unknown; created_at: string },
+        { id?: string; jefe_id?: string | null; usuario_contexto_id?: string | null; tabla: string; operacion: string; fila_id?: string | null; datos_anteriores?: unknown; datos_nuevos?: unknown; created_at?: string }
+      >;
     };
     Views: Record<string, never>;
     Functions: {

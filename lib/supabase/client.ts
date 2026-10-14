@@ -6,7 +6,12 @@ import { getSupabasePublicEnv } from "@/lib/supabase/env";
 
 export function createClient() {
   const { url, anonKey } = getSupabasePublicEnv();
-  return createBrowserClient<Database>(url, anonKey);
+  const client = createBrowserClient<Database>(url, anonKey);
+  const restClient = (client as unknown as { rest: { headers: Headers } }).rest;
+  const contextId = typeof window === "undefined" ? null : window.sessionStorage.getItem("coordi-usuario-contexto");
+  if (contextId) restClient.headers.set("x-user-context", contextId);
+  else restClient.headers.delete("x-user-context");
+  return client;
 }
 
 

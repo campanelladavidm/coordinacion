@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { CatalogOption } from "@/lib/demo-data/catalogs";
 
 export type DemoRole = "COORDINADOR" | "SUPERVISOR" | "JEFE";
+export type ContextoUsuario = { id: string; nombre: string; rol: DemoRole };
 export type FeriadoInterno = { fecha: string; esFeriado: boolean; personalInterno: string[] };
 export type Coordinacion = {
   id: string; fecha: string; ticket: string; cliente: string; tercerizadaId: string | null;
@@ -34,7 +35,8 @@ const CATALOGOS_INICIALES: CatalogosDemo = {
 type DemoContextValue = {
   coordinaciones: Coordinacion[]; custodias: SolicitudCustodia[]; feriados: FeriadoInterno[];
   rangos: RangoCuadrilla[]; errorRangos: string | null;
-  notasEquipo: NotaEquipo[]; catalogos: CatalogosDemo; rolDemo: DemoRole; usuarioActual: UsuarioActual | null;
+  notasEquipo: NotaEquipo[]; catalogos: CatalogosDemo; rolDemo: DemoRole; rolAutenticado: DemoRole; usuarioActual: UsuarioActual | null;
+  usuarioEnContexto: ContextoUsuario | null; seleccionarUsuarioContexto: (usuario: ContextoUsuario | null) => void;
   ready: boolean; error: string | null;
   crearCoordinacion: (coordinacion: NuevaCoordinacion) => Promise<void>;
   actualizarCoordinacion: (id: string, coordinacion: NuevaCoordinacion) => Promise<void>;
@@ -82,7 +84,9 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [feriados, setFeriados] = useState<FeriadoInterno[]>([]);
   const [notasEquipo, setNotasEquipo] = useState<NotaEquipo[]>([]);
   const [catalogos, setCatalogos] = useState<CatalogosDemo>(CATALOGOS_INICIALES);
-  const [rolDemo, setRolDemo] = useState<DemoRole>("COORDINADOR");
+  const [rolAutenticado, setRolAutenticado] = useState<DemoRole>("COORDINADOR");
+  const [usuarioEnContexto, setUsuarioEnContexto] = useState<ContextoUsuario | null>(null);
+  const rolDemo = usuarioEnContexto?.rol ?? rolAutenticado;
   const [usuarioActual, setUsuarioActual] = useState<UsuarioActual | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +102,20 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       const rolQuery = await supabase.from("roles").select("codigo").eq("id", perfilQuery.data.rol_id).single();
       lanzarError(rolQuery.error);
       if (!rolQuery.data) throw new Error("El perfil no tiene un rol válido asignado.");
+      const rolReal: DemoRole = rolQuery.data.codigo === "JEFE" || rolQuery.data.codigo === "SUPERVISOR" ? rolQuery.data.codigo : "COORDINADOR";
+      let contexto: ContextoUsuario | null = null;
+      const contextoGuardado = rolReal === "JEFE" && typeof window !== "undefined" ? window.sessionStorage.getItem("coordi-usuario-contexto") : null;
+      if (contextoGuardado && contextoGuardado !== usuarioId) {
+        const perfilContexto = await supabase.from("usuarios").select("id,nombre_completo,rol_id,activo").eq("id", contextoGuardado).maybeSingle();
+        if (perfilContexto.data?.activo) {
+          const rolContexto = await supabase.from("roles").select("codigo").eq("id", perfilContexto.data.rol_id).single();
+          if (!rolContexto.error && rolContexto.data) {
+            const codigo = rolContexto.data.codigo;
+            contexto = { id: perfilContexto.data.id, nombre: perfilContexto.data.nombre_completo || "Usuario", rol: codigo === "JEFE" || codigo === "SUPERVISOR" ? codigo : "COORDINADOR" };
+          }
+        }
+        if (!contexto) window.sessionStorage.removeItem("coordi-usuario-contexto");
+      }
 
       const [tercerizadasQ, cuadrillasQ, tecnologiasQ, categoriasQ, horariosQ, zonasQ, estadosQ, extrasQ,
         coordinacionesQ, relacionesExtrasQ, custodiasQ, feriadosQ, personalQ, relacionesPersonalQ, notasQ] = await Promise.all([
@@ -163,7 +181,8 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       setCustodias((custodiasQ.data ?? []).map(mapearCustodia));
       setFeriados((feriadosQ.data ?? []).map((row) => ({ fecha: row.fecha, esFeriado: row.es_feriado, personalInterno: personalPorFecha.get(row.fecha) ?? [] })));
       setNotasEquipo((notasQ.data ?? []).map((row) => ({ id: row.id, comentario: row.comentario, usuario: autores.get(row.creado_por) || row.creado_por.slice(0, 8), fechaHora: row.created_at })));
-      setRolDemo(rolQuery.data.codigo === "JEFE" || rolQuery.data.codigo === "SUPERVISOR" ? rolQuery.data.codigo : "COORDINADOR");
+      setRolAutenticado(rolReal);
+      setUsuarioEnContexto(contexto);
       setUsuarioActual({ id: usuarioId, nombre: perfilQuery.data.nombre_completo || email.split("@")[0], email });
       setReady(true);
     } catch (cause) {
@@ -179,7 +198,9 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       if (!vigente) return;
       if (!user) {
         setUsuarioActual(null);
-        setRolDemo("COORDINADOR");
+        setRolAutenticado("COORDINADOR");
+        setUsuarioEnContexto(null);
+        if (typeof window !== "undefined") window.sessionStorage.removeItem("coordi-usuario-contexto");
         setCoordinaciones([]); setCustodias([]); setRangos([]); setErrorRangos(null); setFeriados([]); setNotasEquipo([]);
         setReady(true);
         return;
@@ -194,6 +215,14 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     return () => { vigente = false; subscription.unsubscribe(); };
   }, [cargarDatos]);
 
+  const seleccionarUsuarioContexto = useCallback((usuario: ContextoUsuario | null) => {
+    setUsuarioEnContexto(usuario);
+    if (typeof window !== "undefined") {
+      if (usuario) window.sessionStorage.setItem("coordi-usuario-contexto", usuario.id);
+      else window.sessionStorage.removeItem("coordi-usuario-contexto");
+    }
+  }, []);
+
   const crearCoordinacion = useCallback(async (nueva: NuevaCoordinacion) => {
     const supabase = createClient();
     const { data: auth } = await supabase.auth.getUser();
@@ -202,7 +231,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       fecha: nueva.fecha, ticket: nueva.ticket, cliente: nueva.cliente, tercerizada_id: nueva.tercerizadaId,
       cuadrilla_id: nueva.cuadrillaId, horario_id: nueva.horarioId, tecnologia_id: nueva.tecnologiaId,
       categoria_id: nueva.categoriaId, observaciones: nueva.observaciones || null, zona_id: nueva.zona, orden, ubicacion: nueva.ubicacion || null,
-      estado_id: nueva.estadoId, creado_por: auth.user?.id ?? null,
+      estado_id: nueva.estadoId, creado_por: usuarioEnContexto?.id ?? auth.user?.id ?? null,
     }).select("id,fecha,ticket,cliente,tercerizada_id,cuadrilla_id,horario_id,tecnologia_id,categoria_id,observaciones,zona_id,estado_id,orden,ubicacion").single();
     lanzarError(insertError);
     if (!data) throw new Error("Supabase no devolvió la coordinación creada.");
@@ -211,7 +240,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       lanzarError(extrasError);
     }
     setCoordinaciones((actuales) => [...actuales, mapearCoordinacion(data, nueva.extrasIds)]);
-  }, [coordinaciones]);
+  }, [coordinaciones, usuarioEnContexto]);
 
   const actualizarCoordinacion = useCallback(async (id: string, actualizacion: NuevaCoordinacion) => {
     const supabase = createClient();
@@ -308,12 +337,12 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     const { data: auth } = await supabase.auth.getUser();
     const { data, error: insertError } = await supabase.from("custodias").insert({
       fecha: nueva.fecha, tipo: nueva.tipo, cuadrilla_id: nueva.cuadrillaId,
-      horario_retiro: nueva.horarioId, creado_por: auth.user?.id ?? null,
+      horario_retiro: nueva.horarioId, creado_por: usuarioEnContexto?.id ?? auth.user?.id ?? null,
     }).select("id,fecha,tipo,cuadrilla_id,horario_retiro").single();
     lanzarError(insertError);
     if (!data) throw new Error("Supabase no devolvió la solicitud creada.");
     setCustodias((actuales) => [mapearCustodia(data), ...actuales]);
-  }, []);
+  }, [usuarioEnContexto]);
 
   const eliminarSolicitudCustodia = useCallback(async (id: string) => {
     const supabase = createClient();
@@ -334,7 +363,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       cuadrilla_id: fila.cuadrillaId,
       cantidad_tickets: fila.noTrabaja ? null : fila.cantidadTickets,
       no_trabaja: fila.noTrabaja,
-      actualizado_por: auth.user.id,
+      actualizado_por: usuarioEnContexto?.id ?? auth.user.id,
     }));
     if (filasParaGuardar.length > 0) {
       const { error: guardarError } = await supabase.from("rangos_cuadrilla").upsert(filasParaGuardar, { onConflict: "fecha,cuadrilla_id" });
@@ -351,7 +380,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       ...filasConfiguradas.map((fila) => ({ ...fila, cantidadTickets: fila.noTrabaja ? null : fila.cantidadTickets, fecha })),
     ]);
     setErrorRangos(null);
-  }, []);
+  }, [usuarioEnContexto]);
 
   const guardarFeriado = useCallback(async (feriado: FeriadoInterno) => {
     const supabase = createClient();
@@ -363,7 +392,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       setFeriados((actuales) => actuales.filter((item) => item.fecha !== feriado.fecha));
       return;
     }
-    const { error: feriadoError } = await supabase.from("feriados").upsert({ fecha: feriado.fecha, es_feriado: feriado.esFeriado, creado_por: auth.user?.id ?? null });
+    const { error: feriadoError } = await supabase.from("feriados").upsert({ fecha: feriado.fecha, es_feriado: feriado.esFeriado, creado_por: usuarioEnContexto?.id ?? auth.user?.id ?? null });
     lanzarError(feriadoError);
     const { data: personal, error: personalError } = nombres.length
       ? await supabase.from("personal_interno").upsert(nombres.map((nombre, orden) => ({ nombre, orden })), { onConflict: "nombre" }).select("id,nombre")
@@ -376,7 +405,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       lanzarError(asociacionError);
     }
     setFeriados((actuales) => [...actuales.filter((item) => item.fecha !== feriado.fecha), { ...feriado, personalInterno: nombres }].sort((a, b) => a.fecha.localeCompare(b.fecha)));
-  }, []);
+  }, [usuarioEnContexto]);
 
   const quitarFeriado = useCallback(async (fecha: string) => {
     const supabase = createClient();
@@ -389,12 +418,13 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) throw new Error("Iniciá sesión para agregar una nota.");
-    const { data: perfil } = await supabase.from("usuarios").select("nombre_completo").eq("id", auth.user.id).maybeSingle();
-    const { data, error: insertError } = await supabase.from("notas_equipo").insert({ comentario: comentario.trim(), creado_por: auth.user.id }).select("id,comentario,creado_por,created_at").single();
+    const autorId = usuarioEnContexto?.id ?? auth.user.id;
+    const { data: perfil } = await supabase.from("usuarios").select("nombre_completo").eq("id", autorId).maybeSingle();
+    const { data, error: insertError } = await supabase.from("notas_equipo").insert({ comentario: comentario.trim(), creado_por: autorId }).select("id,comentario,creado_por,created_at").single();
     lanzarError(insertError);
     if (!data) throw new Error("Supabase no devolvió la nota creada.");
     setNotasEquipo((actuales) => [{ id: data.id, comentario: data.comentario, usuario: perfil?.nombre_completo || auth.user.email?.split("@")[0] || "Usuario", fechaHora: data.created_at }, ...actuales]);
-  }, []);
+  }, [usuarioEnContexto]);
 
   const guardarCatalogo = useCallback(async (tipo: CatalogoKey, opciones: CatalogosDemo[CatalogoKey]) => {
     if (rolDemo === "COORDINADOR") throw new Error("Solo Supervisor y Jefe pueden administrar catálogos.");
@@ -443,10 +473,10 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   }, [catalogos, rolDemo]);
 
   const value = useMemo(() => ({
-    coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, usuarioActual,
+    coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto,
     ready, error, crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
     guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo,
-  }), [coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, usuarioActual, ready, error,
+  }), [coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto, ready, error,
     crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
