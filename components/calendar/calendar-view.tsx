@@ -35,6 +35,8 @@ export function CalendarView() {
   const [errorAviso, setErrorAviso] = useState("");
   const [cerrando, setCerrando] = useState<string | null>(null);
   const [indiceAviso, setIndiceAviso] = useState(0);
+  const [mesMovil, setMesMovil] = useState(() => new Date(2026, 9, 1));
+  const [hoyIso, setHoyIso] = useState("");
   const usuarioId = usuarioEnContexto?.id ?? usuarioActual?.id;
 
   const cargarAvisos = useCallback(async () => {
@@ -56,6 +58,15 @@ export function CalendarView() {
     const timer = window.setTimeout(() => { void cargarAvisos(); }, 0);
     return () => window.clearTimeout(timer);
   }, [cargarAvisos]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const ahora = new Date();
+      setMesMovil(new Date(ahora.getFullYear(), ahora.getMonth(), 1));
+      setHoyIso(fechaHoy());
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   function abrirFormulario() {
     const hoy = fechaHoy();
@@ -120,10 +131,34 @@ export function CalendarView() {
     ? "Todo el equipo"
     : destinatarios.map((id) => usuarios.find((usuario) => usuario.id === id)?.nombre).filter(Boolean).join(", ") || "Seleccioná usuarios";
 
+  const offsetMesMovil = (new Date(mesMovil.getFullYear(), mesMovil.getMonth(), 1).getDay() + 6) % 7;
+  const diasEnMesMovil = new Date(mesMovil.getFullYear(), mesMovil.getMonth() + 1, 0).getDate();
+  const cantidadDiasMovil = Math.ceil((offsetMesMovil + diasEnMesMovil) / 7) * 7;
+  const diasMovil = Array.from({ length: cantidadDiasMovil }, (_, index) => new Date(mesMovil.getFullYear(), mesMovil.getMonth(), index - offsetMesMovil + 1));
+  const tituloMesMovil = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(mesMovil);
+
   return (
     <div className="panel calendar-panel">
       <div className="calendar-wrap">
-        <FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="100%" expandRows headerToolbar={{ left: "prev,next today nuevoAviso", center: "title", right: "" }} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={(info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} />
+        <div className="calendar-mobile-view">
+          <div className="calendar-mobile-heading"><h2>{tituloMesMovil}</h2></div>
+          <div className="calendar-mobile-controls">
+            <div className="calendar-mobile-month-nav"><button type="button" aria-label="Mes anterior" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Mes siguiente" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() + 1, 1))}>›</button><button type="button" onClick={() => setMesMovil(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Hoy</button></div>
+            <button type="button" className="calendar-mobile-new-notice" onClick={abrirFormulario}>Nuevo aviso</button>
+          </div>
+          <div className="calendar-mobile-grid" role="grid" aria-label={`Calendario de ${tituloMesMovil}`}>
+            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((dia) => <div key={dia} className="calendar-mobile-weekday" role="columnheader">{dia}</div>)}
+            {diasMovil.map((dia) => {
+              const iso = fechaDeCelda(dia);
+              const feriado = feriados.find((item) => item.fecha === iso);
+              const tieneCoordinaciones = coordinaciones.some((item) => item.fecha === iso);
+              const clases = ["calendar-mobile-day", dia.getMonth() !== mesMovil.getMonth() ? "is-outside" : "", iso === hoyIso ? "is-today" : "", feriado?.esFeriado ? "is-holiday" : "", tieneCoordinaciones ? "has-coordinaciones" : ""].filter(Boolean).join(" ");
+              const etiqueta = new Intl.DateTimeFormat("es-AR", { dateStyle: "full" }).format(dia);
+              return <button key={iso} type="button" role="gridcell" className={clases} aria-label={`${etiqueta}${tieneCoordinaciones ? ", tiene coordinaciones" : ""}${feriado?.esFeriado ? ", feriado" : ""}`} aria-current={iso === hoyIso ? "date" : undefined} onClick={() => router.push(`/coordinaciones/${iso}`)}><span>{dia.getDate()}</span>{(tieneCoordinaciones || feriado?.esFeriado) && <i aria-hidden="true" />}</button>;
+            })}
+          </div>
+        </div>
+        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="100%" expandRows headerToolbar={{ left: "prev,next today nuevoAviso", center: "title", right: "" }} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={(info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
       </div>
       <div className="calendar-note">{error ? `Error de conexión: ${error}` : ready ? "Datos guardados en Supabase." : "Cargando calendario…"}</div>
 

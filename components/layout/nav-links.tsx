@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider";
 
 type MenuIcon = "calendar" | "list" | "settings" | "users" | "chart" | "notes";
@@ -47,6 +48,8 @@ function todayInArgentina() {
 
 export function NavLinks() {
   const pathname = usePathname();
+  const [openAtPath, setOpenAtPath] = useState<string | null>(null);
+  const mobileOpen = openAtPath === pathname;
   const { rolDemo } = useCoordinacionesDemo();
   const dateFromRoute = pathname.match(/^\/coordinaciones\/(\d{4}-\d{2}-\d{2})/)?.[1];
   const coordinationHref = `/coordinaciones/${dateFromRoute ?? todayInArgentina()}`;
@@ -57,7 +60,12 @@ export function NavLinks() {
   });
 
   return (
-    <nav className="nav-list" aria-label="Navegación principal">
+    <>
+    <button type="button" className="mobile-menu-toggle" aria-expanded={mobileOpen} aria-controls="primary-navigation" onClick={() => setOpenAtPath(mobileOpen ? null : pathname)}>
+      <span className="mobile-menu-toggle-icon" aria-hidden="true">{mobileOpen ? "×" : "☰"}</span>
+      <span>Menú</span>
+    </button>
+    <nav id="primary-navigation" className={`nav-list${mobileOpen ? " is-open" : ""}`} aria-label="Navegación principal">
       {visibles.map((link) => {
         const href = link.href === "/coordinaciones" ? coordinationHref : link.href;
         const isActive = link.href === "/"
@@ -66,12 +74,13 @@ export function NavLinks() {
             ? pathname.startsWith("/coordinaciones/")
             : pathname.startsWith(link.href);
         return (
-          <Link key={link.href} className={`nav-link${isActive ? " active" : ""}`} href={href} aria-current={isActive ? "page" : undefined}>
+          <Link key={link.href} className={`nav-link${isActive ? " active" : ""}`} href={href} aria-current={isActive ? "page" : undefined} onClick={() => setOpenAtPath(null)}>
             <span className="nav-icon"><Icon name={link.icon} /></span>
             <span className="nav-text">{link.label}</span>
           </Link>
         );
       })}
     </nav>
+    </>
   );
 }
