@@ -51,6 +51,16 @@ En **Authentication → URL Configuration**, permití la URL local `http://local
 
 La desactivación conserva las coordinaciones y notas históricas asociadas a la cuenta. Solo un Jefe activo puede cambiar permisos de usuarios; la API valida el rol en cada operación.
 
+### Limpieza automatica de coordinaciones
+
+Para una base ya configurada, ejecuta una sola vez `supabase/migrations/202610150001_limpieza_diaria_coordinaciones.sql` desde **SQL Editor**. Esto activa `pg_cron` y programa la limpieza diaria a las 03:00 de Argentina. Conserva las coordinaciones de hoy y de los 7 dias anteriores; elimina las mas antiguas y sus extras asociados. No elimina rangos, custodias ni otros datos.
+
+Puedes verificar las ejecuciones en **Integrations > Cron > Jobs/History**. La tarea usa la fecha de `America/Argentina/Buenos_Aires` para calcular el corte.
+
+### Uso de base de datos en Dash
+
+Para una base ya configurada, ejecuta una sola vez `supabase/migrations/202610150002_uso_base_datos_jefe.sql` desde **SQL Editor**. En la pestana **Dash**, Jefe vera el tamano actual y una barra de uso antes del tablero de Metabase. El porcentaje usa 500 MB como referencia del plan Free; configura `SUPABASE_DATABASE_SIZE_LIMIT_MB` en local y en Vercel si necesitas otro limite. La consulta se ejecuta al cargar la pagina y la funcion SQL restringe el acceso al rol Jefe.
+
 ## Estructura
 
 - `app/`: rutas App Router: calendario, coordinaciones, configuraciones, usuarios y acceso.

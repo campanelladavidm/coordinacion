@@ -51,6 +51,7 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       mi_rol: { Args: Record<string, never>; Returns: string | null };
+      obtener_uso_base_datos_bytes: { Args: Record<string, never>; Returns: number };
       reordenar_coordinaciones: { Args: { p_ids: string[] }; Returns: undefined };
       asignar_coordinaciones_a_cuadrilla: { Args: { p_ids: string[]; p_cuadrilla_id: string }; Returns: undefined };
     };

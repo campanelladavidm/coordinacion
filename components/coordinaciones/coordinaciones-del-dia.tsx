@@ -178,6 +178,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
   const [valoresNuevaCoordinacion, setValoresNuevaCoordinacion] = useState<NuevaCoordinacionDefaults | undefined>(undefined);
   const [busqueda, setBusqueda] = useState("");
   const [cuadrillaCopiada, setCuadrillaCopiada] = useState<string | null>(null);
+  const [seleccionCopiada, setSeleccionCopiada] = useState(false);
   const [errorEstado, setErrorEstado] = useState("");
   const [errorCustodia, setErrorCustodia] = useState("");
   const [errorCoordinacion, setErrorCoordinacion] = useState("");
@@ -327,6 +328,21 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
     }
   }
 
+  async function copiarTicketsSeleccionados() {
+    const tickets = casosSeleccionados
+      .map((coordinacion) => coordinacion.ticket.trim())
+      .filter(Boolean);
+    if (tickets.length === 0) return;
+
+    try {
+      await navigator.clipboard.writeText(tickets.join(","));
+      setSeleccionCopiada(true);
+      window.setTimeout(() => setSeleccionCopiada(false), 1400);
+    } catch {
+      setSeleccionCopiada(false);
+    }
+  }
+
   function abrirRecorrido(items: Coordinacion[]) {
     const ubicaciones = items.map((item) => normalizarUbicacionMaps(item.ubicacion)).filter((ubicacion): ubicacion is string => Boolean(ubicacion));
     if (ubicaciones.length < 2) {
@@ -405,6 +421,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
     </label>
     <button className="button button-primary bulk-assignment-submit" type="button" disabled={guardandoAsignacion || !cuadrillaDestinoId} onClick={() => void asignarSeleccionMasiva()}>{guardandoAsignacion ? "Asignando…" : "Asignar casos"}</button>
     <button className="button bulk-assignment-clear" type="button" disabled={guardandoAsignacion} onClick={limpiarSeleccionMasiva}>Limpiar selección</button>
+    <button className="button bulk-assignment-copy" type="button" disabled={guardandoAsignacion} onClick={() => void copiarTicketsSeleccionados()}>{seleccionCopiada ? "¡Copiados!" : "Copiar seleccionados"}</button>
   </div> : null;
 
   return (

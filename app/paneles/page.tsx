@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { DatabaseUsageCard } from "@/components/paneles/database-usage-card";
 import { PageHeading } from "@/components/ui/page-heading";
 
 const DASHBOARD_URL = "http://172.16.210.32/public/dashboard/542d5440-9ef3-433f-bc04-0cb99bc99d80?tab=540-general-instalaciones";
@@ -10,6 +12,9 @@ export default function PanelesPage() {
         title="Paneles"
         description="Dashboards de instalaciones en tiempo real."
       />
+      <Suspense fallback={<div className="database-usage-skeleton panel" aria-hidden="true" />}>
+        <DatabaseUsageCard />
+      </Suspense>
       <div className="metabase-frame-wrap" style={{ width: "100%", minHeight: "70vh", overflow: "hidden", border: "1px solid #263f59", borderRadius: 12, background: "#fff" }}>
         <iframe
           className="metabase-frame"
