@@ -20,6 +20,10 @@ En un proyecto Supabase nuevo, abrí **SQL Editor** y ejecutá en este orden:
 3. `supabase/migrations/202610090001_orden_coordinaciones.sql`
 4. `supabase/migrations/202610090002_ubicacion_coordinaciones.sql`
 5. `supabase/migrations/202610120001_rangos_cuadrillas.sql`
+6. `supabase/migrations/202610150003_avisos_calendario.sql`
+7. `supabase/migrations/202610150004_avisos_200_caracteres.sql`
+
+For an existing database that already ran the calendar notice migration, run `202610150004_avisos_200_caracteres.sql` once to raise the text limit.
 
 Si la base ya estaba instalada antes del mÃ³dulo Rango, ejecutÃ¡ solamente `202610120001_rangos_cuadrillas.sql` una vez desde SQL Editor.
 

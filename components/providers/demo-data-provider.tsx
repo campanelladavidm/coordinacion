@@ -24,7 +24,6 @@ export type CatalogosDemo = {
   categorias: CatalogOption[]; horarios: CatalogOption[]; zonas: CatalogOption[];
   estados: CatalogOption[]; extras: CatalogOption[];
 };
-export type NotaEquipo = { id: string; comentario: string; usuario: string; fechaHora: string };
 export type UsuarioActual = { id: string; nombre: string; email: string };
 
 const CATALOGOS_INICIALES: CatalogosDemo = {
@@ -35,7 +34,7 @@ const CATALOGOS_INICIALES: CatalogosDemo = {
 type DemoContextValue = {
   coordinaciones: Coordinacion[]; custodias: SolicitudCustodia[]; feriados: FeriadoInterno[];
   rangos: RangoCuadrilla[]; errorRangos: string | null;
-  notasEquipo: NotaEquipo[]; catalogos: CatalogosDemo; rolDemo: DemoRole; rolAutenticado: DemoRole; usuarioActual: UsuarioActual | null;
+  catalogos: CatalogosDemo; rolDemo: DemoRole; rolAutenticado: DemoRole; usuarioActual: UsuarioActual | null;
   usuarioEnContexto: ContextoUsuario | null; seleccionarUsuarioContexto: (usuario: ContextoUsuario | null) => void;
   ready: boolean; error: string | null;
   crearCoordinacion: (coordinacion: NuevaCoordinacion) => Promise<void>;
@@ -49,7 +48,6 @@ type DemoContextValue = {
   guardarRangos: (fecha: string, filas: Omit<RangoCuadrilla, "fecha">[]) => Promise<void>;
   guardarFeriado: (feriado: FeriadoInterno) => Promise<void>;
   quitarFeriado: (fecha: string) => Promise<void>;
-  agregarNotaEquipo: (comentario: string) => Promise<void>;
   guardarCatalogo: (tipo: CatalogoKey, opciones: CatalogosDemo[CatalogoKey]) => Promise<void>;
 };
 
@@ -82,7 +80,6 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [rangos, setRangos] = useState<RangoCuadrilla[]>([]);
   const [errorRangos, setErrorRangos] = useState<string | null>(null);
   const [feriados, setFeriados] = useState<FeriadoInterno[]>([]);
-  const [notasEquipo, setNotasEquipo] = useState<NotaEquipo[]>([]);
   const [catalogos, setCatalogos] = useState<CatalogosDemo>(CATALOGOS_INICIALES);
   const [rolAutenticado, setRolAutenticado] = useState<DemoRole>("COORDINADOR");
   const [usuarioEnContexto, setUsuarioEnContexto] = useState<ContextoUsuario | null>(null);
@@ -118,7 +115,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       }
 
       const [tercerizadasQ, cuadrillasQ, tecnologiasQ, categoriasQ, horariosQ, zonasQ, estadosQ, extrasQ,
-        coordinacionesQ, relacionesExtrasQ, custodiasQ, feriadosQ, personalQ, relacionesPersonalQ, notasQ] = await Promise.all([
+        coordinacionesQ, relacionesExtrasQ, custodiasQ, feriadosQ, personalQ, relacionesPersonalQ] = await Promise.all([
         supabase.from("tercerizadas").select("id,nombre,activo,orden").order("orden"),
         supabase.from("cuadrillas").select("id,nombre,tercerizada_id,zona_id,activo,orden").order("orden"),
         supabase.from("tecnologias").select("id,nombre,activo,orden").order("orden"),
@@ -133,10 +130,9 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         supabase.from("feriados").select("fecha,es_feriado,creado_por,created_at,updated_at").order("fecha"),
         supabase.from("personal_interno").select("id,nombre,activo,orden,created_at"),
         supabase.from("feriado_personal").select("fecha,personal_id,orden").order("orden"),
-        supabase.from("notas_equipo").select("id,comentario,creado_por,created_at").order("created_at", { ascending: false }),
       ]);
       [tercerizadasQ, cuadrillasQ, tecnologiasQ, categoriasQ, horariosQ, zonasQ, estadosQ, extrasQ,
-        coordinacionesQ, relacionesExtrasQ, custodiasQ, feriadosQ, personalQ, relacionesPersonalQ, notasQ].forEach((query) => lanzarError(query.error));
+        coordinacionesQ, relacionesExtrasQ, custodiasQ, feriadosQ, personalQ, relacionesPersonalQ].forEach((query) => lanzarError(query.error));
 
       const rangosQ = await supabase.from("rangos_cuadrilla").select("fecha,cuadrilla_id,cantidad_tickets,no_trabaja").order("fecha");
       if (rangosQ.error) {
@@ -162,10 +158,6 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         const nombre = nombresPersonal.get(relacion.personal_id);
         if (nombre) personalPorFecha.set(relacion.fecha, [...(personalPorFecha.get(relacion.fecha) ?? []), nombre]);
       }
-      const autoresIds = [...new Set((notasQ.data ?? []).map((nota) => nota.creado_por))];
-      const autoresQ = autoresIds.length ? await supabase.from("usuarios").select("id,nombre_completo").in("id", autoresIds) : { data: [], error: null };
-      lanzarError(autoresQ.error);
-      const autores = new Map((autoresQ.data ?? []).map((autor) => [autor.id, autor.nombre_completo]));
 
       setCatalogos({
         tercerizadas: (tercerizadasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
@@ -180,7 +172,6 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       setCoordinaciones((coordinacionesQ.data ?? []).map((row) => mapearCoordinacion(row, coordinacionExtras.get(row.id) ?? [])));
       setCustodias((custodiasQ.data ?? []).map(mapearCustodia));
       setFeriados((feriadosQ.data ?? []).map((row) => ({ fecha: row.fecha, esFeriado: row.es_feriado, personalInterno: personalPorFecha.get(row.fecha) ?? [] })));
-      setNotasEquipo((notasQ.data ?? []).map((row) => ({ id: row.id, comentario: row.comentario, usuario: autores.get(row.creado_por) || row.creado_por.slice(0, 8), fechaHora: row.created_at })));
       setRolAutenticado(rolReal);
       setUsuarioEnContexto(contexto);
       setUsuarioActual({ id: usuarioId, nombre: perfilQuery.data.nombre_completo || email.split("@")[0], email });
@@ -201,7 +192,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         setRolAutenticado("COORDINADOR");
         setUsuarioEnContexto(null);
         if (typeof window !== "undefined") window.sessionStorage.removeItem("coordi-usuario-contexto");
-        setCoordinaciones([]); setCustodias([]); setRangos([]); setErrorRangos(null); setFeriados([]); setNotasEquipo([]);
+        setCoordinaciones([]); setCustodias([]); setRangos([]); setErrorRangos(null); setFeriados([]);
         setReady(true);
         return;
       }
@@ -414,18 +405,6 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
     setFeriados((actuales) => actuales.filter((item) => item.fecha !== fecha));
   }, []);
 
-  const agregarNotaEquipo = useCallback(async (comentario: string) => {
-    const supabase = createClient();
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) throw new Error("Iniciá sesión para agregar una nota.");
-    const autorId = usuarioEnContexto?.id ?? auth.user.id;
-    const { data: perfil } = await supabase.from("usuarios").select("nombre_completo").eq("id", autorId).maybeSingle();
-    const { data, error: insertError } = await supabase.from("notas_equipo").insert({ comentario: comentario.trim(), creado_por: autorId }).select("id,comentario,creado_por,created_at").single();
-    lanzarError(insertError);
-    if (!data) throw new Error("Supabase no devolvió la nota creada.");
-    setNotasEquipo((actuales) => [{ id: data.id, comentario: data.comentario, usuario: perfil?.nombre_completo || auth.user.email?.split("@")[0] || "Usuario", fechaHora: data.created_at }, ...actuales]);
-  }, [usuarioEnContexto]);
-
   const guardarCatalogo = useCallback(async (tipo: CatalogoKey, opciones: CatalogosDemo[CatalogoKey]) => {
     if (rolDemo === "COORDINADOR") throw new Error("Solo Supervisor y Jefe pueden administrar catálogos.");
     const supabase = createClient();
@@ -473,11 +452,11 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   }, [catalogos, rolDemo]);
 
   const value = useMemo(() => ({
-    coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto,
+    coordinaciones, custodias, rangos, errorRangos, feriados, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto,
     ready, error, crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
-    guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo,
-  }), [coordinaciones, custodias, rangos, errorRangos, feriados, notasEquipo, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto, ready, error,
-    crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, agregarNotaEquipo, guardarCatalogo]);
+    guardarRangos, guardarFeriado, quitarFeriado, guardarCatalogo,
+  }), [coordinaciones, custodias, rangos, errorRangos, feriados, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto, ready, error,
+    crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, guardarCatalogo]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
 }

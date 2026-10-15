@@ -38,6 +38,9 @@ export type Database = {
       feriados: Table<{ fecha: string; es_feriado: boolean; creado_por: string | null; created_at: string; updated_at: string }, { fecha: string; es_feriado?: boolean; creado_por?: string | null }>;
       feriado_personal: Table<{ fecha: string; personal_id: string; orden: number }, { fecha: string; personal_id: string; orden?: number }>;
       notas_equipo: Table<{ id: string; comentario: string; creado_por: string; created_at: string }, { id?: string; comentario: string; creado_por: string; created_at?: string }>;
+      avisos: Table<{ id: string; texto: string; desde: string; hasta: string; creado_por: string; created_at: string }, { id?: string; texto: string; desde: string; hasta: string; creado_por: string; created_at?: string }>;
+      aviso_destinatarios: Table<{ aviso_id: string; usuario_id: string }, { aviso_id: string; usuario_id: string }, never>;
+      avisos_cerrados: Table<{ aviso_id: string; usuario_id: string; cerrado_at: string }, { aviso_id: string; usuario_id: string; cerrado_at?: string }>;
       novedades: Table<
         { id: string; fecha: string; motivo: string; descripcion: string; tiempo_devuelto: boolean; detalle_devolucion: string | null; creado_por: string; created_at: string },
         { id?: string; fecha: string; motivo: string; descripcion: string; tiempo_devuelto?: boolean; detalle_devolucion?: string | null; creado_por: string; created_at?: string }
