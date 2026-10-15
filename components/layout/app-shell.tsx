@@ -9,7 +9,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Coordi Westnet, inicio">
-          <img className="brand-phone" src="/brand/phone.png" alt="" />
           <img className="brand-wordmark" src="/brand/coordi-westnet.png" alt="Coordi Westnet instalaciones" />
         </a>
         <Suspense fallback={<nav className="nav-list" aria-label="Navegación principal" />}>

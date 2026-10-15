@@ -46,10 +46,9 @@ export function SessionControls() {
         <span className={"status-dot " + (error ? "session-error-dot" : "status-dot-demo")} />
         <span className="session-name">{usuarioActual.nombre}</span>
       </span>
-      {rolAutenticado === "JEFE" && <label className="user-context-select"><span>Operar como</span><select aria-label="Seleccionar usuario para operar en su contexto" value={usuarioEnContexto?.id ?? ""} onChange={(event) => cambiarContexto(event.target.value)}><option value="">{usuarioActual.nombre} (Jefe)</option>{usuarios.filter((user) => user.id !== usuarioActual.id).map((user) => <option key={user.id} value={user.id}>{user.nombre}</option>)}</select></label>}
-      <button className="button button-small session-signout" type="button" onClick={cerrarSesion} disabled={cerrando}>
+      {rolAutenticado === "JEFE" && <label className="user-context-select"><select aria-label="Seleccionar usuario" title="Seleccionar usuario" value={usuarioEnContexto?.id ?? ""} onChange={(event) => cambiarContexto(event.target.value)}><option value="">{usuarioActual.nombre}</option>{usuarios.filter((user) => user.id !== usuarioActual.id).map((user) => <option key={user.id} value={user.id}>{user.nombre}</option>)}</select></label>}
+      <button className="button button-small session-signout" type="button" onClick={cerrarSesion} disabled={cerrando} aria-label={cerrando ? "Cerrando sesión" : "Cerrar sesión"} title={cerrando ? "Cerrando sesión" : "Cerrar sesión"}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4M8 12h10" /></svg>
-        <span>{cerrando ? "Saliendo…" : "Cerrar sesión"}</span>
       </button>
     </div>
   ) : <span className="topbar-status">Conectando sesión…</span>;

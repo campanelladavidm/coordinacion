@@ -57,7 +57,15 @@ button { color: inherit; }
 .calendar-page { display: flex; height: auto; min-height: 0; flex: 1; flex-direction: column; }
 .calendar-panel { position: relative; display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; }
 .calendar-wrap { display: flex; flex: 1; min-height: 0; flex-direction: column; padding: 0 18px 10px; }
-.calendar-note { border-top: 1px solid var(--border); padding: 10px 18px; color: #7389a2; font-size: 12px; }
+.calendar-footer { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px 20px; border-top: 1px solid var(--border); padding: 8px 18px; }
+.calendar-note { flex: 0 0 auto; padding: 0; color: #7389a2; font-size: 12px; }
+.calendar-legend { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 16px; color: #9aacc0; font-size: 11px; }
+.calendar-legend > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.calendar-legend-dot { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; border: 1px solid transparent; border-radius: 50%; }
+.calendar-legend-holiday { background: #d58b36; }
+.calendar-legend-coordinations { background: #27a47d; }
+.calendar-legend-empty { border-color: #405870; background: #0d1c2e; }
+.calendar-legend-today { background: #72baff; }
 .fc { --fc-border-color: var(--border); --fc-page-bg-color: var(--surface); --fc-neutral-bg-color: #0d1c2e; --fc-list-event-hover-bg-color: var(--surface-hover); --fc-today-bg-color: rgb(47 113 177 / 12%); --fc-button-bg-color: #132b45; --fc-button-border-color: #27415c; --fc-button-hover-bg-color: #1a3858; --fc-button-hover-border-color: #355878; --fc-button-active-bg-color: #1c4b77; --fc-button-active-border-color: #326a9d; --fc-event-bg-color: #1a4a76; --fc-event-border-color: #2d6ba2; color: var(--text); }
 .calendar-wrap > .fc { flex: 1; min-height: 0; }
 .fc .fc-toolbar { margin: 18px 0 20px !important; }
@@ -556,8 +564,7 @@ html[data-theme="light"] .rango-no-trabaja input { accent-color: #2876b2; }
   color: #102638;
 }
 .brand { display: inline-flex; min-width: 0; align-items: center; gap: 8px; padding: 0; }
-.brand-phone { display: block; width: 32px; height: 32px; flex: 0 0 auto; object-fit: contain; mix-blend-mode: multiply; }
-.brand-wordmark { display: block; width: 132px; max-height: 42px; flex: 0 1 auto; object-fit: contain; mix-blend-mode: multiply; }
+.brand-wordmark { display: block; width: 170px; max-height: 50px; flex: 0 1 auto; object-fit: contain; mix-blend-mode: multiply; }
 .nav-list { display: flex; min-width: 0; align-items: stretch; justify-content: center; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .nav-list::-webkit-scrollbar { display: none; }
 .nav-link {
@@ -608,9 +615,9 @@ html[data-theme="light"] .rango-no-trabaja input { accent-color: #2876b2; }
 .session-controls .session-error-dot { background: #bd3447; box-shadow: 0 0 0 3px rgb(189 52 71 / 12%); }
 .session-controls .status-dot-demo { background: #27a47d; box-shadow: 0 0 0 3px rgb(39 164 125 / 14%); }
 .session-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
-.session-signout.button { min-height: 34px; gap: 7px; border-color: #527d9a; border-radius: 8px; background: rgb(255 255 255 / 18%); padding: 0 12px; color: #102d43; font-size: 12px; }
+.session-signout.button { display: inline-flex; width: 38px; min-width: 38px; height: 38px; min-height: 38px; align-items: center; justify-content: center; gap: 0; border-color: #527d9a; border-radius: 8px; background: rgb(255 255 255 / 18%); padding: 0; color: #102d43; font-size: 0; }
 .session-signout.button:hover { border-color: #315f7e; background: rgb(255 255 255 / 34%); }
-.session-signout svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.session-signout svg { display: block; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .main-content { width: 100%; max-width: none; margin: 0; padding-top: 28px; }
 html[data-theme="light"] .topbar, html[data-theme="dark"] .topbar { border-color: #6c99b8; background: #86b3d0; color: #102638; }
 html[data-theme="light"] .topbar-status, html[data-theme="dark"] .topbar-status { color: #17364d; }
@@ -631,15 +638,13 @@ html[data-theme="light"] .session-signout.button:hover, html[data-theme="dark"] 
 @media (max-width: 640px) {
   .topbar { grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 5px 10px 0; }
   .brand { gap: 5px; }
-  .brand-phone { width: 26px; height: 26px; }
-  .brand-wordmark { width: 104px; max-height: 34px; }
+  .brand-wordmark { width: 124px; max-height: 40px; }
   .topbar-tools { gap: 8px; }
   .theme-toggle.theme-toggle-switch { width: 58px; height: 28px; }
   .theme-toggle-switch.theme-is-dark::before { transform: translateX(28px); }
   .session-controls { gap: 8px; }
   .session-name { display: none; }
-  .session-signout.button { min-height: 30px; padding: 0 8px; font-size: 11px; }
-  .session-signout svg { display: none; }
+  .session-signout.button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0; font-size: 0; }
   .nav-list { gap: 0; margin: 0 -10px; padding: 0 6px; }
   .nav-link { min-height: 40px; gap: 5px; padding: 0 8px; font-size: 12px; }
   .nav-icon, .nav-icon svg { width: 16px; height: 16px; }
@@ -647,13 +652,16 @@ html[data-theme="light"] .session-signout.button:hover, html[data-theme="dark"] 
   .main-content { padding: 20px 14px 26px; }
 }
 @media (max-width: 370px) {
-  .brand-wordmark { width: 88px; }
-  .session-signout.button { font-size: 0; }
-  .session-signout.button::after { content: "Salir"; font-size: 11px; }
+  .brand-wordmark { width: 104px; }
+  .session-signout.button { width: 34px; min-width: 34px; height: 34px; min-height: 34px; }
 }
 
 /* Follow-up: logo transparency, rounded navbar, full-width settings pages */
 .topbar { width: calc(100% - 16px); margin: 8px auto 0; border: 1px solid #6c99b8; border-radius: 8px; }
+@media (min-width: 641px) {
+  .topbar { padding-left: 0; }
+  .brand { margin-left: -12px; }
+}
 .brand-wordmark { mix-blend-mode: normal; }
 .nav-link.active { box-shadow: none; }
 html[data-theme="light"] .nav-link.active, html[data-theme="dark"] .nav-link.active { box-shadow: none; }
@@ -751,9 +759,8 @@ html[data-theme="light"] .novedad-time-check { color: #4f657b; }
 @media (max-width: 640px) {
   .novedades-heading-manager { align-items: flex-start; flex-direction: column; gap: 0; }
   .novedades-heading-manager > .button { margin: -12px 0 18px; }
-  .user-context-select > span { display: none; }
   .user-context-select { padding: 0 7px; }
-  .user-context-select select { max-width: 112px; }
+  .user-context-select select { max-width: 150px; }
   .novedades-filters { grid-template-columns: 1fr 1fr; }
   .novedades-filters .novedades-search { grid-column: 1 / -1; }
   .novedad-row, .novedades-own-cards .novedad-row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 13px; }
@@ -897,12 +904,19 @@ html[data-theme="light"] .novedad-time-check { color: #4f657b; }
   .button-row > .button { flex: 1 1 100%; }
   .coordination-form, .holiday-form { padding: 14px; }
   .main-content table { display: block; max-width: 100%; overflow-x: auto; }
-  .topbar-status, .user-context-select { display: none; }
-  .brand-phone { display: none; }
+  .topbar-status { display: none; }
   .session-controls { gap: 6px; }
-  .session-signout.button { width: 48px; min-height: 30px; justify-content: center; padding: 0 5px; font-size: 0; }
-  .session-signout.button::after { content: "Salir"; font-size: 11px; }
-  .session-signout svg { display: none; }
+  .session-signout.button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; justify-content: center; padding: 0; font-size: 0; }
+  .session-signout svg { display: block; }
+}
+html[data-theme="light"] .calendar-footer { border-color: #dce4eb; }
+html[data-theme="light"] .calendar-legend { color: #5e7388; }
+html[data-theme="light"] .calendar-legend-empty { border-color: #b9c8d6; background: #edf3f8; }
+html[data-theme="light"] .calendar-legend-today { background: #5aa8ed; }
+@media (max-width: 640px) {
+  .calendar-footer { align-items: flex-start; flex-direction: column; gap: 8px; padding: 9px 12px; }
+  .calendar-legend { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: start; gap: 8px 10px; font-size: 10px; }
+  .calendar-legend > span { white-space: normal; }
 }
 @media (min-width: 641px) and (max-height: 900px) {
   .fc .fc-daygrid-day-frame { min-height: clamp(30px, calc((100dvh - 400px) / 6), 68px); }
@@ -913,7 +927,7 @@ html[data-theme="light"] .novedad-time-check { color: #4f657b; }
 }
 @media (max-width: 380px) {
   .theme-toggle.theme-toggle-switch { display: none; }
-  .brand-wordmark { width: 82px; }
+  .brand-wordmark { width: 96px; }
   .main-content { padding-right: 9px; padding-left: 9px; }
   .fc .fc-button { padding: 0 7px; }
   .fc .fc-toolbar-chunk:first-child { gap: 3px; }

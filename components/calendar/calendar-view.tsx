@@ -18,6 +18,10 @@ const fechaHoy = () => {
 function fechaDeCelda(fecha: Date) {
   return String(fecha.getFullYear()) + "-" + String(fecha.getMonth() + 1).padStart(2, "0") + "-" + String(fecha.getDate()).padStart(2, "0");
 }
+function tituloDelMes(fecha: Date) {
+  const mes = new Intl.DateTimeFormat("es-AR", { month: "long" }).format(fecha);
+  return `${mes.charAt(0).toLocaleUpperCase("es-AR")}${mes.slice(1)} ${fecha.getFullYear()}`;
+}
 
 export function CalendarView() {
   const router = useRouter();
@@ -135,7 +139,7 @@ export function CalendarView() {
   const diasEnMesMovil = new Date(mesMovil.getFullYear(), mesMovil.getMonth() + 1, 0).getDate();
   const cantidadDiasMovil = Math.ceil((offsetMesMovil + diasEnMesMovil) / 7) * 7;
   const diasMovil = Array.from({ length: cantidadDiasMovil }, (_, index) => new Date(mesMovil.getFullYear(), mesMovil.getMonth(), index - offsetMesMovil + 1));
-  const tituloMesMovil = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(mesMovil);
+  const tituloMesMovil = tituloDelMes(mesMovil);
 
   return (
     <div className="panel calendar-panel">
@@ -158,9 +162,17 @@ export function CalendarView() {
             })}
           </div>
         </div>
-        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="100%" expandRows headerToolbar={{ left: "prev,next today nuevoAviso", center: "title", right: "" }} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={(info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
+        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="100%" expandRows headerToolbar={{ left: "prev,next today nuevoAviso", center: "title", right: "" }} titleFormat={(arg) => tituloDelMes(new Date(arg.date.year, arg.date.month, 1))} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={(info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
       </div>
-      <div className="calendar-note">{error ? `Error de conexión: ${error}` : ready ? "Datos guardados en Supabase." : "Cargando calendario…"}</div>
+      <div className="calendar-footer">
+        <div className="calendar-note">{error ? `Error de conexión: ${error}` : ready ? "Datos guardados en Supabase." : "Cargando calendario…"}</div>
+        <div className="calendar-legend" aria-label="Leyenda del calendario">
+          <span><i className="calendar-legend-dot calendar-legend-holiday" />Feriados</span>
+          <span><i className="calendar-legend-dot calendar-legend-coordinations" />Día con coordinaciones</span>
+          <span><i className="calendar-legend-dot calendar-legend-empty" />Día sin coordinaciones</span>
+          <span><i className="calendar-legend-dot calendar-legend-today" />Hoy</span>
+        </div>
+      </div>
 
       {avisoActual && <aside className="calendar-alert" key={avisoActual.id} role="status"><p>{avisoActual.texto}</p><div className="calendar-alert-controls">{avisos.length > 1 && <button type="button" aria-label="Aviso anterior" title="Aviso anterior" onClick={() => setIndiceAviso((actual) => (actual - 1 + avisos.length) % avisos.length)}>‹</button>}<span className="calendar-alert-counter">{indiceAviso + 1} de {avisos.length}</span>{avisos.length > 1 && <button type="button" aria-label="Aviso siguiente" title="Aviso siguiente" onClick={() => setIndiceAviso((actual) => (actual + 1) % avisos.length)}>›</button>}<button type="button" aria-label="Ocultar hasta volver a entrar al calendario" title="Ocultar hasta volver a entrar al calendario" onClick={() => quitarAvisoDeLaVista(avisoActual.id)}>−</button><button type="button" aria-label="Cerrar aviso hasta su fecha de vencimiento" title="Cerrar definitivamente hasta su vencimiento" disabled={cerrando === avisoActual.id} onClick={() => void ocultarDefinitivamente(avisoActual.id)}>×</button></div></aside>}
 
