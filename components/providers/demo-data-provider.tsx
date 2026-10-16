@@ -406,7 +406,6 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const guardarCatalogo = useCallback(async (tipo: CatalogoKey, opciones: CatalogosDemo[CatalogoKey]) => {
-    if (rolDemo === "COORDINADOR") throw new Error("Solo Supervisor y Jefe pueden administrar catálogos.");
     const supabase = createClient();
     const anteriores = catalogos[tipo] as CatalogOption[];
     const opcionesActivasAnteriores = anteriores.filter((opcion) => opcion.activo !== false);
@@ -449,7 +448,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       }
       return actualizados;
     });
-  }, [catalogos, rolDemo]);
+  }, [catalogos]);
 
   const value = useMemo(() => ({
     coordinaciones, custodias, rangos, errorRangos, feriados, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto,

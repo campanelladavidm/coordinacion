@@ -29,7 +29,7 @@ function crearId() {
 }
 
 export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
-  const { catalogos, coordinaciones, custodias, guardarCatalogo, rolDemo } = useCoordinacionesDemo();
+  const { catalogos, coordinaciones, custodias, guardarCatalogo } = useCoordinacionesDemo();
   const [nombre, setNombre] = useState("");
   const [tercerizadaId, setTercerizadaId] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -38,7 +38,6 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
   const todasLasOpciones = catalogos[tipo] as CatalogOption[];
   const opciones = todasLasOpciones.filter((opcion) => opcion.activo !== false);
   const tercerizadasActivas = catalogos.tercerizadas.filter((empresa) => empresa.activo !== false);
-  const puedeGestionar = rolDemo === "SUPERVISOR" || rolDemo === "JEFE";
   const esCuadrilla = tipo === "cuadrillas";
   const esTercerizada = tipo === "tercerizadas";
 
@@ -145,12 +144,10 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
           {esTercerizada && <span className="mt-1 block text-xs text-slate-400">{cuadrillas.filter((item) => item.tercerizadaId === opcion.id).length} cuadrillas</span>}
           {uso > 0 && <span className="mt-1 block text-xs text-slate-500">En uso: {uso}</span>}
         </div>
-        {puedeGestionar && (
-          <div className="flex shrink-0 gap-2">
-            <button className="button button-small" type="button" disabled={guardando} onClick={() => editar(opcion)}>Editar</button>
-            <button className="button button-small border-rose-900/70 text-rose-300 disabled:cursor-not-allowed disabled:opacity-40" type="button" disabled={guardando} title="Quitar este elemento de las opciones activas" onClick={() => void eliminar(opcion)}>Eliminar</button>
-          </div>
-        )}
+        <div className="flex shrink-0 gap-2">
+          <button className="button button-small" type="button" disabled={guardando} onClick={() => editar(opcion)}>Editar</button>
+          <button className="button button-small border-rose-900/70 text-rose-300 disabled:cursor-not-allowed disabled:opacity-40" type="button" disabled={guardando} title="Quitar este elemento de las opciones activas" onClick={() => void eliminar(opcion)}>Eliminar</button>
+        </div>
       </li>
     );
   }
@@ -158,8 +155,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
   const cuadrillas = catalogos.cuadrillas.filter((cuadrilla) => cuadrilla.activo !== false);
   return (
     <div className="catalog-manager grid gap-4">
-      {puedeGestionar ? (
-        <form className="panel grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(180px,0.7fr)_auto] sm:items-end" onSubmit={guardar}>
+      <form className="panel grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(180px,0.7fr)_auto] sm:items-end" onSubmit={guardar}>
           <label className="form-field mt-0">{editandoId ? "Editar nombre" : "Nuevo elemento"}
             <input value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required placeholder={`Nombre de ${titulos[tipo].toLocaleLowerCase("es")}`} />
           </label>
@@ -176,10 +172,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
             {editandoId && <button className="button" type="button" onClick={cancelarEdicion}>Cancelar</button>}
           </div>
           {mensaje && <p className="m-0 text-xs text-sky-200 sm:col-span-full" role="status">{mensaje}</p>}
-        </form>
-      ) : (
-        <p className="m-0 rounded-lg border border-slate-700/70 bg-slate-900/50 px-4 py-3 text-xs text-slate-400">La edición de catálogos está disponible para Supervisor y Jefe.</p>
-      )}
+      </form>
 
       {esCuadrilla ? tercerizadasActivas.map((empresa) => {
         const deEmpresa = cuadrillas.filter((item) => item.tercerizadaId === empresa.id);

@@ -17,14 +17,13 @@ function fechaLocalHoy() {
 }
 
 export default function FeriadosPage() {
-  const { feriados, rolDemo, guardarFeriado, quitarFeriado } = useCoordinacionesDemo();
+  const { feriados, guardarFeriado, quitarFeriado } = useCoordinacionesDemo();
   const [fecha, setFecha] = useState(fechaLocalHoy);
   const [esFeriado, setEsFeriado] = useState(false);
   const [personal, setPersonal] = useState("");
   const [guardado, setGuardado] = useState(false);
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const puedeGestionar = rolDemo === "JEFE" || rolDemo === "SUPERVISOR";
 
   function seleccionarFecha(nuevaFecha: string) {
     setFecha(nuevaFecha);
@@ -72,8 +71,7 @@ export default function FeriadosPage() {
     <section className="settings-page">
       <Link href="/configuraciones" className="back-link">&larr; Volver a configuraciones</Link>
       <PageHeading eyebrow="Configuración" title="Feriados y personal interno" description="Marcá los feriados y asigná el personal interno que trabajará cada día." />
-      {!puedeGestionar ? <EmptyState title="Acceso restringido" description="Solo los roles Supervisor y Jefe pueden administrar feriados y asignaciones." /> : (
-        <div className="holiday-settings-layout">
+      <div className="holiday-settings-layout">
           <form className="panel holiday-form" onSubmit={guardar}>
             <h2 className="holiday-form-title">Configurar día</h2>
             <label className="form-field">Fecha *<input type="date" value={fecha} onChange={(event) => seleccionarFecha(event.target.value)} required /></label>
@@ -95,8 +93,7 @@ export default function FeriadosPage() {
               </article>
             ))}
           </div>
-        </div>
-      )}
+      </div>
     </section>
   );
 }

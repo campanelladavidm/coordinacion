@@ -46,6 +46,14 @@ export type Database = {
         { id?: string; fecha: string; motivo: string; descripcion: string; tiempo_devuelto?: boolean; detalle_devolucion?: string | null; creado_por: string; created_at?: string }
       >;
       novedades_vistas: Table<{ novedad_id: string; jefe_id: string; revisado_at: string }, { novedad_id: string; jefe_id: string; revisado_at?: string }>;
+      liquidaciones: Table<
+        { id: string; tercerizada_id: string; mes: number; anio: number; estado: "BORRADOR" | "FINALIZADA"; conceptos: unknown[]; creado_por: string; finalizado_por: string | null; finalizado_at: string | null; created_at: string; updated_at: string },
+        { id?: string; tercerizada_id: string; mes: number; anio: number; estado?: "BORRADOR" | "FINALIZADA"; conceptos?: unknown[]; creado_por: string; finalizado_por?: string | null; finalizado_at?: string | null; created_at?: string; updated_at?: string }
+      >;
+      liquidaciones_exportaciones: Table<
+        { id: string; mes: number; anio: number; nombre_archivo: string; storage_path: string; creado_por: string; created_at: string },
+        { id?: string; mes: number; anio: number; nombre_archivo: string; storage_path: string; creado_por: string; created_at?: string }
+      >;
       actuaciones_jefe: Table<
         { id: string; jefe_id: string | null; usuario_contexto_id: string | null; tabla: string; operacion: string; fila_id: string | null; datos_anteriores: unknown; datos_nuevos: unknown; created_at: string },
         { id?: string; jefe_id?: string | null; usuario_contexto_id?: string | null; tabla: string; operacion: string; fila_id?: string | null; datos_anteriores?: unknown; datos_nuevos?: unknown; created_at?: string }
