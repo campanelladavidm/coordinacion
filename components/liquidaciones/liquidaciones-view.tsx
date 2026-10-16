@@ -7,7 +7,7 @@ type Estado = "BORRADOR" | "FINALIZADA";
 type FormulaVinculo = { conceptoId: string; modo: "FIJO" | "PORCENTAJE"; valor: number } | { conceptoId: string; adicional: number };
 type Concepto = { id: string; nombre: string; tipo: "SUMA" | "RESTA"; cantidad: number; precio: number; nota: string; enlace: string; formula?: FormulaVinculo };
 type Tercerizada = { id: string; nombre: string };
-type Liquidacion = { id: string; tercerizada_id: string; mes: number; anio: number; estado: Estado; conceptos: Concepto[]; finalizado_at: string | null };
+type Liquidacion = { id: string; tercerizada_id: string; mes: number; anio: number; estado: Estado; conceptos: Concepto[]; informacion_adicional: string; finalizado_at: string | null };
 type Exportacion = { nombre_archivo: string; created_at: string } | null;
 const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const formatoMoneda = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
@@ -76,6 +76,7 @@ export function LiquidacionesView() {
   const [exportacion, setExportacion] = useState<Exportacion>(null);
   const [tercerizadaId, setTercerizadaId] = useState("");
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
+  const [informacionAdicional, setInformacionAdicional] = useState("");
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
@@ -91,6 +92,7 @@ export function LiquidacionesView() {
   const [modoImportacion, setModoImportacion] = useState<"COMPLETO" | "SOLO_CONCEPTOS">("COMPLETO");
   const [imprimiendo, setImprimiendo] = useState<string | null>(null);
   const ultimoGuardado = useRef("");
+  const tercerizadaSeleccionada = useRef(tercerizadaId);
   const contextoId = usuarioEnContexto?.id;
   const puedeReabrir = rolAutenticado === "JEFE" || rolAutenticado === "SUPERVISOR";
 
@@ -101,15 +103,19 @@ export function LiquidacionesView() {
       setTercerizadas(data.tercerizadas);
       setLiquidaciones(data.liquidaciones);
       setExportacion(data.exportacion);
-      const actualId = mantenerSeleccion && data.tercerizadas.some((item) => item.id === tercerizadaId) ? tercerizadaId : data.tercerizadas[0]?.id ?? "";
+      const seleccionActual = tercerizadaSeleccionada.current;
+      const actualId = mantenerSeleccion && data.tercerizadas.some((item) => item.id === seleccionActual) ? seleccionActual : data.tercerizadas[0]?.id ?? "";
       const loadedConcepts = data.liquidaciones.find((item) => item.tercerizada_id === actualId)?.conceptos ?? [];
+      const loadedInformation = data.liquidaciones.find((item) => item.tercerizada_id === actualId)?.informacion_adicional ?? "";
+      tercerizadaSeleccionada.current = actualId;
       setTercerizadaId(actualId);
       setConceptos(loadedConcepts);
-      ultimoGuardado.current = JSON.stringify({ tercerizadaId: actualId, mes, anio, conceptos: loadedConcepts });
+      setInformacionAdicional(loadedInformation);
+      ultimoGuardado.current = JSON.stringify({ tercerizadaId: actualId, mes, anio, conceptos: loadedConcepts, informacionAdicional: loadedInformation });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudieron cargar las liquidaciones.");
     } finally { setCargando(false); }
-  }, [mes, anio, contextoId, tercerizadaId]);
+  }, [mes, anio, contextoId]);
 
   useEffect(() => {
     const hoy = new Date();
@@ -134,19 +140,19 @@ export function LiquidacionesView() {
 
   useEffect(() => {
     if (!periodoListo || cargando || ocupado || soloLectura || !tercerizadaId) return;
-    const snapshot = JSON.stringify({ tercerizadaId, mes, anio, conceptos });
+    const snapshot = JSON.stringify({ tercerizadaId, mes, anio, conceptos, informacionAdicional });
     if (snapshot === ultimoGuardado.current) return;
     const timeout = window.setTimeout(async () => {
       setMensaje("Guardando automáticamente…"); setError("");
       try {
         const result = await api<{ liquidacion: { id: string; estado: Estado; finalizado_at?: string | null } }>("/api/liquidaciones", {
-          method: "POST", body: JSON.stringify({ operacion: "guardar", tercerizadaId, mes, anio, conceptos }),
+          method: "POST", body: JSON.stringify({ operacion: "guardar", tercerizadaId, mes, anio, conceptos, informacionAdicional }),
         }, contextoId);
         ultimoGuardado.current = snapshot;
         const saved = result.liquidacion;
         setLiquidaciones((current) => {
           const existing = current.some((item) => item.tercerizada_id === tercerizadaId);
-          const row: Liquidacion = { id: saved.id, tercerizada_id: tercerizadaId, mes, anio, estado: saved.estado, conceptos, finalizado_at: saved.finalizado_at ?? null };
+          const row: Liquidacion = { id: saved.id, tercerizada_id: tercerizadaId, mes, anio, estado: saved.estado, conceptos, informacion_adicional: informacionAdicional, finalizado_at: saved.finalizado_at ?? null };
           return existing ? current.map((item) => item.tercerizada_id === tercerizadaId ? row : item) : [...current, row];
         });
         setMensaje("Guardado automáticamente.");
@@ -156,20 +162,24 @@ export function LiquidacionesView() {
       }
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [conceptos, tercerizadaId, mes, anio, contextoId, periodoListo, cargando, ocupado, soloLectura]);
+  }, [conceptos, informacionAdicional, tercerizadaId, mes, anio, contextoId, periodoListo, cargando, ocupado, soloLectura]);
 
   async function cambiarTercerizada(id: string) {
     if (id === tercerizadaId) return;
-    if (!(await guardar(conceptos, tercerizadaId, mes, anio))) return;
-    const nextConcepts = liquidaciones.find((item) => item.tercerizada_id === id)?.conceptos ?? [];
-    ultimoGuardado.current = JSON.stringify({ tercerizadaId: id, mes, anio, conceptos: nextConcepts });
+    if (!(await guardar(conceptos, tercerizadaId, mes, anio, informacionAdicional))) return;
+    const nextLiquidacion = liquidaciones.find((item) => item.tercerizada_id === id);
+    const nextConcepts = nextLiquidacion?.conceptos ?? [];
+    const nextInformation = nextLiquidacion?.informacion_adicional ?? "";
+    ultimoGuardado.current = JSON.stringify({ tercerizadaId: id, mes, anio, conceptos: nextConcepts, informacionAdicional: nextInformation });
+    tercerizadaSeleccionada.current = id;
     setTercerizadaId(id);
     setConceptos(nextConcepts);
+    setInformacionAdicional(nextInformation);
     setMensaje(""); setError("");
   }
 
   async function cambiarPeriodo(nuevoMes: number, nuevoAnio: number) {
-    if (!(await guardar(conceptos, tercerizadaId, mes, anio))) return;
+    if (!(await guardar(conceptos, tercerizadaId, mes, anio, informacionAdicional))) return;
     setMes(nuevoMes);
     setAnio(nuevoAnio);
   }
@@ -206,18 +216,18 @@ export function LiquidacionesView() {
     setConceptos((actual) => actual.filter((item) => item.id !== id).map((item) => item.formula?.conceptoId === id ? { ...item, formula: undefined } : item));
   }
 
-  async function guardar(actualConceptos = conceptos, destinoId = tercerizadaId, destinoMes = mes, destinoAnio = anio) {
+  async function guardar(actualConceptos = conceptos, destinoId = tercerizadaId, destinoMes = mes, destinoAnio = anio, actualInformacion = informacionAdicional) {
     if (!destinoId) return true;
-    const snapshot = JSON.stringify({ tercerizadaId: destinoId, mes: destinoMes, anio: destinoAnio, conceptos: actualConceptos });
+    const snapshot = JSON.stringify({ tercerizadaId: destinoId, mes: destinoMes, anio: destinoAnio, conceptos: actualConceptos, informacionAdicional: actualInformacion });
     if (snapshot === ultimoGuardado.current) return true;
     setOcupado(true); setError(""); setMensaje("Guardando automáticamente…");
     try {
-      const result = await api<{ liquidacion: { id: string; estado: Estado; finalizado_at?: string | null } }>("/api/liquidaciones", { method: "POST", body: JSON.stringify({ operacion: "guardar", tercerizadaId: destinoId, mes: destinoMes, anio: destinoAnio, conceptos: actualConceptos }) }, contextoId);
+      const result = await api<{ liquidacion: { id: string; estado: Estado; finalizado_at?: string | null } }>("/api/liquidaciones", { method: "POST", body: JSON.stringify({ operacion: "guardar", tercerizadaId: destinoId, mes: destinoMes, anio: destinoAnio, conceptos: actualConceptos, informacionAdicional: actualInformacion }) }, contextoId);
       ultimoGuardado.current = snapshot;
       const saved = result.liquidacion;
       setLiquidaciones((current) => {
         const existing = current.some((item) => item.tercerizada_id === destinoId);
-        const row: Liquidacion = { id: saved.id, tercerizada_id: destinoId, mes: destinoMes, anio: destinoAnio, estado: saved.estado, conceptos: actualConceptos, finalizado_at: saved.finalizado_at ?? null };
+        const row: Liquidacion = { id: saved.id, tercerizada_id: destinoId, mes: destinoMes, anio: destinoAnio, estado: saved.estado, conceptos: actualConceptos, informacion_adicional: actualInformacion, finalizado_at: saved.finalizado_at ?? null };
         return existing ? current.map((item) => item.tercerizada_id === destinoId ? row : item) : [...current, row];
       });
       setMensaje("Guardado automáticamente.");
@@ -349,6 +359,7 @@ export function LiquidacionesView() {
   const liquidacionPdf = imprimiendo ? liquidaciones.find((item) => item.tercerizada_id === imprimiendo) : undefined;
   const empresaPdf = imprimiendo ? tercerizadas.find((item) => item.id === imprimiendo) : undefined;
   const conceptosPdf = imprimiendo === tercerizadaId ? conceptos : liquidacionPdf?.conceptos ?? [];
+  const informacionPdf = imprimiendo === tercerizadaId ? informacionAdicional : liquidacionPdf?.informacion_adicional ?? "";
   const sumaPdf = conceptosPdf.reduce((acc, item) => acc + (item.tipo === "SUMA" ? item.cantidad * item.precio : 0), 0);
   const restaPdf = conceptosPdf.reduce((acc, item) => acc + (item.tipo === "RESTA" ? item.cantidad * item.precio : 0), 0);
 
@@ -392,6 +403,11 @@ export function LiquidacionesView() {
               </article>)}
               <div className="liqui-totals"><span>Sumas <strong>{formatoMoneda.format(suma)}</strong></span><span>Restas <strong className="is-deduction">− {formatoMoneda.format(resta)}</strong></span><span className="liqui-grand-total">Total <strong>{formatoMoneda.format(total)}</strong></span></div>
             </section>
+            <section className="panel liqui-additional-info" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 9, width: "100%", padding: 14 }}>
+              <label htmlFor="liqui-informacion-adicional" style={{ color: "var(--text)", fontSize: 12, fontWeight: 600 }}>Información adicional</label>
+              <textarea id="liqui-informacion-adicional" value={informacionAdicional} maxLength={20000} rows={6} onChange={(event) => setInformacionAdicional(event.target.value)} placeholder="Agregá acá información adicional necesaria para esta liquidación…" disabled={soloLectura} style={{ display: "block", boxSizing: "border-box", width: "100%", minHeight: 150, resize: "vertical", border: "1px solid var(--border)", borderRadius: 7, outline: 0, background: "var(--background)", padding: "10px 11px", color: "var(--text)", font: "inherit", fontSize: 13, lineHeight: 1.5 }} />
+              <small style={{ color: "var(--muted)", fontSize: 11 }}>{soloLectura ? "Liquidación finalizada." : "Se guarda automáticamente mientras escribís."}</small>
+            </section>
           </>}
           <div className="liqui-feedback" aria-live="polite">{error && <p className="liqui-error">{error}</p>}{mensaje && !mensaje.startsWith("Guardado automáticamente") && !mensaje.startsWith("Guardando automáticamente") && <p className="liqui-success">{mensaje}</p>}</div>
           <div className="liqui-main-actions">
@@ -407,7 +423,7 @@ export function LiquidacionesView() {
           <section className="panel liqui-tool-card liqui-documents"><div><h3>Documentos del período</h3><p>{nombresMeses[mes - 1]} {anio} · PDFs por tercerizada</p></div>{tercerizadas.map((empresa) => <div className="liqui-document-row" key={empresa.id}><span>{empresa.nombre}<small className={`liqui-status-text ${liquidaciones.find((item) => item.tercerizada_id === empresa.id)?.estado === "FINALIZADA" ? "is-final" : ""}`}>{liquidaciones.find((item) => item.tercerizada_id === empresa.id)?.estado === "FINALIZADA" ? "Finalizada" : "Borrador"}</small></span><button className="button" type="button" onClick={() => descargarPdf(empresa.id)}>Descargar PDF</button></div>)}{exportacion && <button className="button liqui-action" type="button" onClick={() => void descargarZipArchivado()} disabled={ocupado}>Descargar ZIP archivado</button>}<button className="button liqui-action" type="button" onClick={() => void exportarZip()} disabled={ocupado}>{ocupado ? "Preparando ZIP…" : exportacion ? "Actualizar ZIP archivado" : "Generar y guardar ZIP de CSV"}</button><small className="liqui-muted">Un CSV por tercerizada. Archivo: liquidaciones_{nombresMeses[mes - 1].toLocaleLowerCase("es-AR")}_{anio}.zip</small></section>
         </aside>
       </div>
-      {imprimiendo && <div className="liqui-print-document"><h1>Liquidación de {empresaPdf?.nombre} · {nombresMeses[mes - 1]} {anio}</h1><p>Estado: {liquidacionPdf?.estado ?? "BORRADOR"}</p><table><thead><tr><th>Concepto</th><th>Tipo</th><th>Cantidad</th><th>Precio unitario</th><th>Nota</th><th>Enlace</th><th>Subtotal</th></tr></thead><tbody>{conceptosPdf.map((item) => <tr key={item.id}><td>{item.nombre}</td><td>{item.tipo === "RESTA" ? "Resta" : "Suma"}</td><td>{numero(item.cantidad)}</td><td>{formatoMoneda.format(item.precio)}</td><td>{item.nota}</td><td>{item.enlace}</td><td>{formatoMoneda.format(item.cantidad * item.precio * (item.tipo === "RESTA" ? -1 : 1))}</td></tr>)}</tbody></table><p>Sumas: {formatoMoneda.format(sumaPdf)}</p><p>Restas: − {formatoMoneda.format(restaPdf)}</p><h2>Total: {formatoMoneda.format(sumaPdf - restaPdf)}</h2></div>}
+      {imprimiendo && <div className="liqui-print-document"><h1>Liquidación de {empresaPdf?.nombre} · {nombresMeses[mes - 1]} {anio}</h1><p>Estado: {liquidacionPdf?.estado ?? "BORRADOR"}</p><table><thead><tr><th>Concepto</th><th>Tipo</th><th>Cantidad</th><th>Precio unitario</th><th>Nota</th><th>Enlace</th><th>Subtotal</th></tr></thead><tbody>{conceptosPdf.map((item) => <tr key={item.id}><td>{item.nombre}</td><td>{item.tipo === "RESTA" ? "Resta" : "Suma"}</td><td>{numero(item.cantidad)}</td><td>{formatoMoneda.format(item.precio)}</td><td>{item.nota}</td><td>{item.enlace}</td><td>{formatoMoneda.format(item.cantidad * item.precio * (item.tipo === "RESTA" ? -1 : 1))}</td></tr>)}</tbody></table>{informacionPdf && <><h2>Información adicional</h2><p>{informacionPdf}</p></>}<p>Sumas: {formatoMoneda.format(sumaPdf)}</p><p>Restas: − {formatoMoneda.format(restaPdf)}</p><h2>Total: {formatoMoneda.format(sumaPdf - restaPdf)}</h2></div>}
     </section>
   );
 }

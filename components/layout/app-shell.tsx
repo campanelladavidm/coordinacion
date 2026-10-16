@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { NavLinks } from "@/components/layout/nav-links";
 import { SessionControls } from "@/components/layout/session-controls";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { WorkspaceFrame } from "@/components/layout/workspace-frame";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -19,9 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SessionControls />
         </div>
       </header>
-      <div className="workspace">
-        <main className="main-content">{children}</main>
-      </div>
+      <WorkspaceFrame>{children}</WorkspaceFrame>
     </div>
   );
 }

@@ -47,8 +47,8 @@ export type Database = {
       >;
       novedades_vistas: Table<{ novedad_id: string; jefe_id: string; revisado_at: string }, { novedad_id: string; jefe_id: string; revisado_at?: string }>;
       liquidaciones: Table<
-        { id: string; tercerizada_id: string; mes: number; anio: number; estado: "BORRADOR" | "FINALIZADA"; conceptos: unknown[]; creado_por: string; finalizado_por: string | null; finalizado_at: string | null; created_at: string; updated_at: string },
-        { id?: string; tercerizada_id: string; mes: number; anio: number; estado?: "BORRADOR" | "FINALIZADA"; conceptos?: unknown[]; creado_por: string; finalizado_por?: string | null; finalizado_at?: string | null; created_at?: string; updated_at?: string }
+        { id: string; tercerizada_id: string; mes: number; anio: number; estado: "BORRADOR" | "FINALIZADA"; conceptos: unknown[]; informacion_adicional: string; creado_por: string; finalizado_por: string | null; finalizado_at: string | null; created_at: string; updated_at: string },
+        { id?: string; tercerizada_id: string; mes: number; anio: number; estado?: "BORRADOR" | "FINALIZADA"; conceptos?: unknown[]; informacion_adicional?: string; creado_por: string; finalizado_por?: string | null; finalizado_at?: string | null; created_at?: string; updated_at?: string }
       >;
       liquidaciones_exportaciones: Table<
         { id: string; mes: number; anio: number; nombre_archivo: string; storage_path: string; creado_por: string; created_at: string },

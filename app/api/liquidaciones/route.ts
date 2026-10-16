@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient();
     const [tercerizadas, liquidaciones, exportacion] = await Promise.all([
       admin.from("tercerizadas").select("id,nombre,activo").order("orden").order("nombre"),
-      admin.from("liquidaciones").select("id,tercerizada_id,mes,anio,estado,conceptos,finalizado_por,finalizado_at,updated_at").eq("mes", mes).eq("anio", anio),
+      admin.from("liquidaciones").select("id,tercerizada_id,mes,anio,estado,conceptos,informacion_adicional,finalizado_por,finalizado_at,updated_at").eq("mes", mes).eq("anio", anio),
       admin.from("liquidaciones_exportaciones").select("nombre_archivo,created_at").eq("mes", mes).eq("anio", anio).maybeSingle(),
     ]);
       if (tercerizadas.error) throw tercerizadas.error;
@@ -125,7 +125,8 @@ export async function POST(request: NextRequest) {
       const mes = Number(body.mes); const anio = Number(body.anio);
       const tercerizadaId = typeof body.tercerizadaId === "string" ? body.tercerizadaId : "";
       const conceptos = validarConceptos(body.conceptos);
-      if (!periodoValido(mes, anio) || !tercerizadaId || !conceptos) return NextResponse.json({ error: "Revisá los datos de la liquidación." }, { status: 400 });
+      const informacionAdicional = typeof body.informacionAdicional === "string" ? body.informacionAdicional.trim().slice(0, 20000) : "";
+      if (!periodoValido(mes, anio) || !tercerizadaId || !conceptos || (body.informacionAdicional !== undefined && typeof body.informacionAdicional !== "string")) return NextResponse.json({ error: "Revisá los datos de la liquidación." }, { status: 400 });
       const actual = await admin.from("liquidaciones").select("id,estado,creado_por").eq("tercerizada_id", tercerizadaId).eq("mes", mes).eq("anio", anio).maybeSingle();
       if (actual.error) throw actual.error;
       if (actual.data?.estado === "FINALIZADA" && !["JEFE", "SUPERVISOR"].includes(auth.actor.rolAutenticado)) {
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
       }
       const estado = actual.data?.estado ?? "BORRADOR";
       const saved = await admin.from("liquidaciones").upsert({
-        tercerizada_id: tercerizadaId, mes, anio, conceptos, estado,
+        tercerizada_id: tercerizadaId, mes, anio, conceptos, informacion_adicional: informacionAdicional, estado,
         creado_por: actual.data?.creado_por ?? auth.actor.usuarioId,
         ...(estado === "FINALIZADA" ? {} : { finalizado_por: null, finalizado_at: null }), updated_at: new Date().toISOString(),
       }, { onConflict: "tercerizada_id,mes,anio" }).select("id,estado,finalizado_at,updated_at").single();
@@ -145,11 +146,11 @@ export async function POST(request: NextRequest) {
       const tercerizadaId = typeof body.tercerizadaId === "string" ? body.tercerizadaId : "";
       const estado = body.estado;
       if (!periodoValido(mes, anio) || !tercerizadaId || (estado !== "BORRADOR" && estado !== "FINALIZADA")) return NextResponse.json({ error: "Estado o período inválido." }, { status: 400 });
-      const actual = await admin.from("liquidaciones").select("estado,conceptos,creado_por").eq("tercerizada_id", tercerizadaId).eq("mes", mes).eq("anio", anio).maybeSingle();
+      const actual = await admin.from("liquidaciones").select("estado,conceptos,informacion_adicional,creado_por").eq("tercerizada_id", tercerizadaId).eq("mes", mes).eq("anio", anio).maybeSingle();
       if (actual.error) throw actual.error;
       if (actual.data?.estado === "FINALIZADA" && estado === "BORRADOR" && !["JEFE", "SUPERVISOR"].includes(auth.actor.rolAutenticado)) return NextResponse.json({ error: "Solo Jefe o Supervisor pueden reabrir una liquidación finalizada." }, { status: 403 });
       const changed = await admin.from("liquidaciones").upsert({
-        tercerizada_id: tercerizadaId, mes, anio, conceptos: actual.data?.conceptos ?? [], estado,
+        tercerizada_id: tercerizadaId, mes, anio, conceptos: actual.data?.conceptos ?? [], informacion_adicional: actual.data?.informacion_adicional ?? "", estado,
         creado_por: actual.data?.creado_por ?? auth.actor.usuarioId, finalizado_por: estado === "FINALIZADA" ? auth.actor.usuarioId : null,
         finalizado_at: estado === "FINALIZADA" ? new Date().toISOString() : null, updated_at: new Date().toISOString(),
       }, { onConflict: "tercerizada_id,mes,anio" }).select("id,estado,updated_at").single();
@@ -185,15 +186,16 @@ export async function POST(request: NextRequest) {
       if (!periodoValido(mes, anio)) return NextResponse.json({ error: "Seleccioná un período válido." }, { status: 400 });
       const companies = await admin.from("tercerizadas").select("id,activo");
       if (companies.error) throw companies.error;
-      const existing = await admin.from("liquidaciones").select("tercerizada_id,conceptos,creado_por").eq("mes", mes).eq("anio", anio);
+      const existing = await admin.from("liquidaciones").select("tercerizada_id,conceptos,informacion_adicional,creado_por").eq("mes", mes).eq("anio", anio);
       if (existing.error) throw existing.error;
-      const porEmpresa = new Map<string, { conceptos: unknown[]; creadoPor: string }>();
-      for (const row of existing.data ?? []) porEmpresa.set(row.tercerizada_id, { conceptos: row.conceptos, creadoPor: row.creado_por });
+      const porEmpresa = new Map<string, { conceptos: unknown[]; informacionAdicional: string; creadoPor: string }>();
+      for (const row of existing.data ?? []) porEmpresa.set(row.tercerizada_id, { conceptos: row.conceptos, informacionAdicional: row.informacion_adicional ?? "", creadoPor: row.creado_por });
       const fecha = new Date().toISOString();
       const periodCompanies = (companies.data ?? []).filter((company) => company.activo || porEmpresa.has(company.id));
       const rows = periodCompanies.map((company) => ({
         tercerizada_id: company.id, mes, anio, estado: "FINALIZADA" as const,
         conceptos: porEmpresa.get(company.id)?.conceptos ?? [], creado_por: porEmpresa.get(company.id)?.creadoPor ?? auth.actor.usuarioId,
+        informacion_adicional: porEmpresa.get(company.id)?.informacionAdicional ?? "",
         finalizado_por: auth.actor.usuarioId, finalizado_at: fecha, updated_at: fecha,
       }));
       if (rows.length) {
