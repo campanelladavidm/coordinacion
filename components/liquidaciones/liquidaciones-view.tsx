@@ -62,7 +62,8 @@ function crearZip(archivos: { nombre: string; contenido: Uint8Array }[]) {
   const centralSize = central.reduce((sum, part) => sum + part.length, 0);
   const end = new Uint8Array(22); const view = new DataView(end.buffer);
   view.setUint32(0, 0x06054b50, true); view.setUint16(8, archivos.length, true); view.setUint16(10, archivos.length, true); view.setUint32(12, centralSize, true); view.setUint32(16, offset, true);
-  return new Blob([...local, ...central, end], { type: "application/zip" });
+  const partesBlob = [...local, ...central, end].map((parte) => Uint8Array.from(parte).buffer);
+  return new Blob(partesBlob, { type: "application/zip" });
 }
 
 export function LiquidacionesView() {
