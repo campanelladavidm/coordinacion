@@ -25,7 +25,8 @@ function tituloDelMes(fecha: Date) {
 
 export function CalendarView() {
   const router = useRouter();
-  const { coordinaciones, feriados, ready, error, usuarioActual, usuarioEnContexto } = useCoordinacionesDemo();
+  const { fechasConCoordinaciones, feriados, ready, error, usuarioActual, usuarioEnContexto, rolDemo } = useCoordinacionesDemo();
+  const soloCalendario = rolDemo === "SOPORTE";
   const [usuarios, setUsuarios] = useState<UsuarioAviso[]>([]);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
   const [modal, setModal] = useState(false);
@@ -115,7 +116,7 @@ export function CalendarView() {
   function classesForDay(info: DayCellContentArg) {
     const fecha = fechaDeCelda(info.date);
     const classes: string[] = [];
-    if (coordinaciones.some((coordinacion) => coordinacion.fecha === fecha)) classes.push("has-coordinaciones");
+    if (fechasConCoordinaciones.includes(fecha)) classes.push("has-coordinaciones");
     if (feriados.some((feriado) => feriado.fecha === fecha && feriado.esFeriado)) classes.push("is-holiday");
     return classes;
   }
@@ -155,14 +156,14 @@ export function CalendarView() {
             {diasMovil.map((dia) => {
               const iso = fechaDeCelda(dia);
               const feriado = feriados.find((item) => item.fecha === iso);
-              const tieneCoordinaciones = coordinaciones.some((item) => item.fecha === iso);
+              const tieneCoordinaciones = fechasConCoordinaciones.includes(iso);
               const clases = ["calendar-mobile-day", dia.getMonth() !== mesMovil.getMonth() ? "is-outside" : "", iso === hoyIso ? "is-today" : "", feriado?.esFeriado ? "is-holiday" : "", tieneCoordinaciones ? "has-coordinaciones" : ""].filter(Boolean).join(" ");
               const etiqueta = new Intl.DateTimeFormat("es-AR", { dateStyle: "full" }).format(dia);
-              return <button key={iso} type="button" role="gridcell" className={clases} aria-label={`${etiqueta}${tieneCoordinaciones ? ", tiene coordinaciones" : ""}${feriado?.esFeriado ? ", feriado" : ""}`} aria-current={iso === hoyIso ? "date" : undefined} onClick={() => router.push(`/coordinaciones/${iso}`)}><span>{dia.getDate()}</span>{(tieneCoordinaciones || feriado?.esFeriado) && <i aria-hidden="true" />}</button>;
+              return <button key={iso} type="button" role="gridcell" className={clases} aria-label={`${etiqueta}${tieneCoordinaciones ? ", tiene coordinaciones" : ""}${feriado?.esFeriado ? ", feriado" : ""}`} aria-current={iso === hoyIso ? "date" : undefined} aria-disabled={soloCalendario || undefined} onClick={() => { if (!soloCalendario) router.push(`/coordinaciones/${iso}`); }}><span>{dia.getDate()}</span>{(tieneCoordinaciones || feriado?.esFeriado) && <i aria-hidden="true" />}</button>;
             })}
           </div>
         </div>
-        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="100%" expandRows headerToolbar={{ left: "prev,next today nuevoAviso", center: "title", right: "" }} titleFormat={(arg) => tituloDelMes(new Date(arg.date.year, arg.date.month, 1))} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={(info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
+        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="100%" expandRows headerToolbar={{ left: "prev,next today nuevoAviso", center: "title", right: "" }} titleFormat={(arg) => tituloDelMes(new Date(arg.date.year, arg.date.month, 1))} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={soloCalendario ? undefined : (info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
       </div>
       <div className="calendar-footer">
         <div className="calendar-note">{error ? `Error de conexión: ${error}` : ready ? "Datos guardados en Supabase." : "Cargando calendario…"}</div>

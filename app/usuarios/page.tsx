@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
 
-type Rol = { id: string; codigo: "COORDINADOR" | "SUPERVISOR" | "JEFE"; nombre: string };
+type Rol = { id: string; codigo: "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE"; nombre: string };
 type Usuario = {
   id: string; email: string; nombre: string; rolId: string; rol: string;
   activo: boolean; confirmado: boolean; createdAt: string; lastSignInAt: string | null;

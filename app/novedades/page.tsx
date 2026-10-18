@@ -10,7 +10,7 @@ type Novedad = {
   tiempoDevuelto: boolean; detalleDevolucion: string | null; creadoPor: string;
   nombreUsuario: string; createdAt: string; revisada: boolean;
 };
-type Rol = "COORDINADOR" | "SUPERVISOR" | "JEFE";
+type Rol = "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE";
 
 async function respuestaApi<T>(init?: RequestInit, contextId?: string): Promise<T> {
   const response = await fetch("/api/novedades", {

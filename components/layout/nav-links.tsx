@@ -56,7 +56,8 @@ export function NavLinks() {
   const dateFromRoute = pathname.match(/^\/coordinaciones\/(\d{4}-\d{2}-\d{2})/)?.[1];
   const coordinationHref = `/coordinaciones/${dateFromRoute ?? todayInArgentina()}`;
   const visibles = links.filter((link) => {
-    if (link.href === "/configuraciones") return true;
+    if (link.href === "/configuraciones") return rolDemo !== "SOPORTE";
+    if (link.href === "/coordinaciones") return rolDemo !== "SOPORTE";
     if (link.href === "/liqui") return rolDemo === "SUPERVISOR" || rolDemo === "JEFE";
     if (link.href === "/usuarios") return rolDemo === "JEFE";
     return true;

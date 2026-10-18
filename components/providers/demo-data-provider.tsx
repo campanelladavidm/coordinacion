@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { createClient } from "@/lib/supabase/client";
 import type { CatalogOption } from "@/lib/demo-data/catalogs";
 
-export type DemoRole = "COORDINADOR" | "SUPERVISOR" | "JEFE";
+export type DemoRole = "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE";
 export type ContextoUsuario = { id: string; nombre: string; rol: DemoRole };
 export type FeriadoInterno = { fecha: string; esFeriado: boolean; personalInterno: string[] };
 export type Coordinacion = {
@@ -32,7 +32,7 @@ const CATALOGOS_INICIALES: CatalogosDemo = {
 };
 
 type DemoContextValue = {
-  coordinaciones: Coordinacion[]; custodias: SolicitudCustodia[]; feriados: FeriadoInterno[];
+  coordinaciones: Coordinacion[]; fechasConCoordinaciones: string[]; custodias: SolicitudCustodia[]; feriados: FeriadoInterno[];
   rangos: RangoCuadrilla[]; errorRangos: string | null;
   catalogos: CatalogosDemo; rolDemo: DemoRole; rolAutenticado: DemoRole; usuarioActual: UsuarioActual | null;
   usuarioEnContexto: ContextoUsuario | null; seleccionarUsuarioContexto: (usuario: ContextoUsuario | null) => void;
@@ -76,6 +76,7 @@ function mapearCustodia(row: { id: string; fecha: string; tipo: TipoCustodia; cu
 
 export function DemoDataProvider({ children }: { children: ReactNode }) {
   const [coordinaciones, setCoordinaciones] = useState<Coordinacion[]>([]);
+  const [fechasConCoordinaciones, setFechasConCoordinaciones] = useState<string[]>([]);
   const [custodias, setCustodias] = useState<SolicitudCustodia[]>([]);
   const [rangos, setRangos] = useState<RangoCuadrilla[]>([]);
   const [errorRangos, setErrorRangos] = useState<string | null>(null);
@@ -99,7 +100,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       const rolQuery = await supabase.from("roles").select("codigo").eq("id", perfilQuery.data.rol_id).single();
       lanzarError(rolQuery.error);
       if (!rolQuery.data) throw new Error("El perfil no tiene un rol válido asignado.");
-      const rolReal: DemoRole = rolQuery.data.codigo === "JEFE" || rolQuery.data.codigo === "SUPERVISOR" ? rolQuery.data.codigo : "COORDINADOR";
+      const rolReal: DemoRole = rolQuery.data.codigo === "JEFE" || rolQuery.data.codigo === "SUPERVISOR" || rolQuery.data.codigo === "SOPORTE" ? rolQuery.data.codigo : "COORDINADOR";
       let contexto: ContextoUsuario | null = null;
       const contextoGuardado = rolReal === "JEFE" && typeof window !== "undefined" ? window.sessionStorage.getItem("coordi-usuario-contexto") : null;
       if (contextoGuardado && contextoGuardado !== usuarioId) {
@@ -108,10 +109,38 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
           const rolContexto = await supabase.from("roles").select("codigo").eq("id", perfilContexto.data.rol_id).single();
           if (!rolContexto.error && rolContexto.data) {
             const codigo = rolContexto.data.codigo;
-            contexto = { id: perfilContexto.data.id, nombre: perfilContexto.data.nombre_completo || "Usuario", rol: codigo === "JEFE" || codigo === "SUPERVISOR" ? codigo : "COORDINADOR" };
+            contexto = { id: perfilContexto.data.id, nombre: perfilContexto.data.nombre_completo || "Usuario", rol: codigo === "JEFE" || codigo === "SUPERVISOR" || codigo === "SOPORTE" ? codigo : "COORDINADOR" };
           }
         }
         if (!contexto) window.sessionStorage.removeItem("coordi-usuario-contexto");
+      }
+
+      if (rolReal === "SOPORTE") {
+        const [fechasQ, feriadosQ, personalQ, relacionesPersonalQ] = await Promise.all([
+          supabase.rpc("fechas_con_coordinaciones_calendario"),
+          supabase.from("feriados").select("fecha,es_feriado,creado_por,created_at,updated_at").order("fecha"),
+          supabase.from("personal_interno").select("id,nombre,activo,orden,created_at"),
+          supabase.from("feriado_personal").select("fecha,personal_id,orden").order("orden"),
+        ]);
+        [fechasQ, feriadosQ, personalQ, relacionesPersonalQ].forEach((query) => lanzarError(query.error));
+        const nombresPersonal = new Map((personalQ.data ?? []).map((item) => [item.id, item.nombre]));
+        const personalPorFecha = new Map<string, string[]>();
+        for (const relacion of relacionesPersonalQ.data ?? []) {
+          const nombre = nombresPersonal.get(relacion.personal_id);
+          if (nombre) personalPorFecha.set(relacion.fecha, [...(personalPorFecha.get(relacion.fecha) ?? []), nombre]);
+        }
+        setCatalogos(CATALOGOS_INICIALES);
+        setCoordinaciones([]);
+        setFechasConCoordinaciones((fechasQ.data ?? []).map((item) => item.fecha));
+        setCustodias([]);
+        setRangos([]);
+        setErrorRangos(null);
+        setFeriados((feriadosQ.data ?? []).map((row) => ({ fecha: row.fecha, esFeriado: row.es_feriado, personalInterno: personalPorFecha.get(row.fecha) ?? [] })));
+        setRolAutenticado(rolReal);
+        setUsuarioEnContexto(null);
+        setUsuarioActual({ id: usuarioId, nombre: perfilQuery.data.nombre_completo || email.split("@")[0], email });
+        setReady(true);
+        return;
       }
 
       const [tercerizadasQ, cuadrillasQ, tecnologiasQ, categoriasQ, horariosQ, zonasQ, estadosQ, extrasQ,
@@ -170,6 +199,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         extras: (extrasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
       });
       setCoordinaciones((coordinacionesQ.data ?? []).map((row) => mapearCoordinacion(row, coordinacionExtras.get(row.id) ?? [])));
+      setFechasConCoordinaciones([...new Set((coordinacionesQ.data ?? []).map((row) => row.fecha))]);
       setCustodias((custodiasQ.data ?? []).map(mapearCustodia));
       setFeriados((feriadosQ.data ?? []).map((row) => ({ fecha: row.fecha, esFeriado: row.es_feriado, personalInterno: personalPorFecha.get(row.fecha) ?? [] })));
       setRolAutenticado(rolReal);
@@ -192,7 +222,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         setRolAutenticado("COORDINADOR");
         setUsuarioEnContexto(null);
         if (typeof window !== "undefined") window.sessionStorage.removeItem("coordi-usuario-contexto");
-        setCoordinaciones([]); setCustodias([]); setRangos([]); setErrorRangos(null); setFeriados([]);
+        setCoordinaciones([]); setFechasConCoordinaciones([]); setCustodias([]); setRangos([]); setErrorRangos(null); setFeriados([]);
         setReady(true);
         return;
       }
@@ -451,10 +481,10 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   }, [catalogos]);
 
   const value = useMemo(() => ({
-    coordinaciones, custodias, rangos, errorRangos, feriados, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto,
+    coordinaciones, fechasConCoordinaciones, custodias, rangos, errorRangos, feriados, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto,
     ready, error, crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia,
     guardarRangos, guardarFeriado, quitarFeriado, guardarCatalogo,
-  }), [coordinaciones, custodias, rangos, errorRangos, feriados, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto, ready, error,
+  }), [coordinaciones, fechasConCoordinaciones, custodias, rangos, errorRangos, feriados, catalogos, rolDemo, rolAutenticado, usuarioActual, usuarioEnContexto, seleccionarUsuarioContexto, ready, error,
     crearCoordinacion, actualizarCoordinacion, asignarCoordinaciones, moverCoordinacion, eliminarCoordinacion, reordenarCoordinaciones, crearSolicitudCustodia, eliminarSolicitudCustodia, guardarRangos, guardarFeriado, quitarFeriado, guardarCatalogo]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;

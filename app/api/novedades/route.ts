@@ -9,7 +9,7 @@ async function obtenerActor(request?: NextRequest) {
   if (authError || !user) return { response: NextResponse.json({ error: "Iniciá sesión para continuar." }, { status: 401 }) };
   const { data: rol, error: roleError } = await session.rpc("mi_rol");
   if (roleError) return { response: NextResponse.json({ error: "No se pudo validar tu rol." }, { status: 503 }) };
-  if (!rol || !["COORDINADOR", "SUPERVISOR", "JEFE"].includes(rol)) {
+  if (!rol || !["COORDINADOR", "SUPERVISOR", "JEFE", "SOPORTE"].includes(rol)) {
     return { response: NextResponse.json({ error: "No tenés permiso para acceder a las novedades." }, { status: 403 }) };
   }
   const contextoId = request?.headers.get("x-user-context");

@@ -360,8 +360,7 @@ export function LiquidacionesView() {
   const empresaPdf = imprimiendo ? tercerizadas.find((item) => item.id === imprimiendo) : undefined;
   const conceptosPdf = imprimiendo === tercerizadaId ? conceptos : liquidacionPdf?.conceptos ?? [];
   const informacionPdf = imprimiendo === tercerizadaId ? informacionAdicional : liquidacionPdf?.informacion_adicional ?? "";
-  const sumaPdf = conceptosPdf.reduce((acc, item) => acc + (item.tipo === "SUMA" ? item.cantidad * item.precio : 0), 0);
-  const restaPdf = conceptosPdf.reduce((acc, item) => acc + (item.tipo === "RESTA" ? item.cantidad * item.precio : 0), 0);
+  const totalPdf = conceptosPdf.reduce((acc, item) => acc + (item.tipo === "RESTA" ? -1 : 1) * item.cantidad * item.precio, 0);
 
   return (
     <section className="liqui-page">
@@ -423,7 +422,24 @@ export function LiquidacionesView() {
           <section className="panel liqui-tool-card liqui-documents"><div><h3>Documentos del período</h3><p>{nombresMeses[mes - 1]} {anio} · PDFs por tercerizada</p></div>{tercerizadas.map((empresa) => <div className="liqui-document-row" key={empresa.id}><span>{empresa.nombre}<small className={`liqui-status-text ${liquidaciones.find((item) => item.tercerizada_id === empresa.id)?.estado === "FINALIZADA" ? "is-final" : ""}`}>{liquidaciones.find((item) => item.tercerizada_id === empresa.id)?.estado === "FINALIZADA" ? "Finalizada" : "Borrador"}</small></span><button className="button" type="button" onClick={() => descargarPdf(empresa.id)}>Descargar PDF</button></div>)}{exportacion && <button className="button liqui-action" type="button" onClick={() => void descargarZipArchivado()} disabled={ocupado}>Descargar ZIP archivado</button>}<button className="button liqui-action" type="button" onClick={() => void exportarZip()} disabled={ocupado}>{ocupado ? "Preparando ZIP…" : exportacion ? "Actualizar ZIP archivado" : "Generar y guardar ZIP de CSV"}</button><small className="liqui-muted">Un CSV por tercerizada. Archivo: liquidaciones_{nombresMeses[mes - 1].toLocaleLowerCase("es-AR")}_{anio}.zip</small></section>
         </aside>
       </div>
-      {imprimiendo && <div className="liqui-print-document"><h1>Liquidación de {empresaPdf?.nombre} · {nombresMeses[mes - 1]} {anio}</h1><p>Estado: {liquidacionPdf?.estado ?? "BORRADOR"}</p><table><thead><tr><th>Concepto</th><th>Tipo</th><th>Cantidad</th><th>Precio unitario</th><th>Nota</th><th>Enlace</th><th>Subtotal</th></tr></thead><tbody>{conceptosPdf.map((item) => <tr key={item.id}><td>{item.nombre}</td><td>{item.tipo === "RESTA" ? "Resta" : "Suma"}</td><td>{numero(item.cantidad)}</td><td>{formatoMoneda.format(item.precio)}</td><td>{item.nota}</td><td>{item.enlace}</td><td>{formatoMoneda.format(item.cantidad * item.precio * (item.tipo === "RESTA" ? -1 : 1))}</td></tr>)}</tbody></table>{informacionPdf && <><h2>Información adicional</h2><p>{informacionPdf}</p></>}<p>Sumas: {formatoMoneda.format(sumaPdf)}</p><p>Restas: − {formatoMoneda.format(restaPdf)}</p><h2>Total: {formatoMoneda.format(sumaPdf - restaPdf)}</h2></div>}
+      {imprimiendo && <article className="liqui-print-document">
+        <header className="liqui-print-heading">
+          <p>LIQUIDACIÓN MENSUAL</p>
+          <h1>{empresaPdf?.nombre}</h1>
+          <span>{nombresMeses[mes - 1]} {anio}</span>
+        </header>
+        <div className="liqui-print-table-wrap"><table>
+          <thead><tr><th>Concepto</th><th>Cantidad</th><th>Precio unitario</th><th>Subtotal</th></tr></thead>
+          <tbody>{conceptosPdf.map((item) => <tr key={item.id}>
+            <td>{item.nombre || "Concepto sin nombre"}</td>
+            <td>{numero(item.cantidad)}</td>
+            <td>{formatoMoneda.format(item.precio)}</td>
+            <td className={item.tipo === "RESTA" ? "liqui-print-deduction" : undefined}>{item.tipo === "RESTA" ? "− " : ""}{formatoMoneda.format(item.cantidad * item.precio)}</td>
+          </tr>)}</tbody>
+        </table></div>
+        {informacionPdf && <section className="liqui-print-extra"><h2>Información adicional</h2><p>{informacionPdf}</p></section>}
+        <footer className="liqui-print-total"><span>Total</span><strong>{formatoMoneda.format(totalPdf)}</strong></footer>
+      </article>}
     </section>
   );
 }

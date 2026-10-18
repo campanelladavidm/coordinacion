@@ -11,7 +11,7 @@ type CatalogInsert = { id?: string; nombre: string; activo?: boolean; orden?: nu
 export type Database = {
   public: {
     Tables: {
-      roles: Table<{ id: string; codigo: "COORDINADOR" | "SUPERVISOR" | "JEFE"; nombre: string; created_at: string }, { id?: string; codigo: "COORDINADOR" | "SUPERVISOR" | "JEFE"; nombre: string }>;
+      roles: Table<{ id: string; codigo: "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE"; nombre: string; created_at: string }, { id?: string; codigo: "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE"; nombre: string }>;
       usuarios: Table<{ id: string; nombre_completo: string | null; rol_id: string; activo: boolean; created_at: string; updated_at: string }, { id: string; nombre_completo?: string | null; rol_id: string; activo?: boolean }>;
       tercerizadas: Table<CatalogRow, CatalogInsert>;
       cuadrillas: Table<CatalogRow & { tercerizada_id: string | null; zona_id: string | null }, CatalogInsert & { tercerizada_id?: string | null; zona_id?: string | null }>;
@@ -62,6 +62,7 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       mi_rol: { Args: Record<string, never>; Returns: string | null };
+      fechas_con_coordinaciones_calendario: { Args: Record<string, never>; Returns: { fecha: string }[] };
       obtener_uso_base_datos_bytes: { Args: Record<string, never>; Returns: number };
       reordenar_coordinaciones: { Args: { p_ids: string[] }; Returns: undefined };
       asignar_coordinaciones_a_cuadrilla: { Args: { p_ids: string[]; p_cuadrilla_id: string }; Returns: undefined };

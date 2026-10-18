@@ -22,7 +22,7 @@ export function SessionControls() {
       const roles = new Map((data.roles ?? []).map((role) => [role.id, role.codigo]));
       setUsuarios((data.usuarios ?? []).filter((user) => user.activo).map((user) => ({
         id: user.id, nombre: user.nombre || "Usuario",
-        rol: roles.get(user.rolId) === "JEFE" || roles.get(user.rolId) === "SUPERVISOR" ? roles.get(user.rolId) as "JEFE" | "SUPERVISOR" : "COORDINADOR",
+        rol: roles.get(user.rolId) === "JEFE" || roles.get(user.rolId) === "SUPERVISOR" || roles.get(user.rolId) === "SOPORTE" ? roles.get(user.rolId) as "JEFE" | "SUPERVISOR" | "SOPORTE" : "COORDINADOR",
       })));
     }).catch(() => undefined);
     return () => { vigente = false; };

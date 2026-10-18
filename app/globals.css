@@ -1092,13 +1092,31 @@ html[data-theme="light"] .liqui-linked-history-row b { color: #286fa8; }
   .liqui-delete { grid-column: 2; grid-row: auto; }
 }
 @media print {
+  @page { size: A4; margin: 0; }
   body * { visibility: hidden !important; }
   .liqui-print-document, .liqui-print-document * { visibility: visible !important; }
-  .liqui-print-document { position: absolute; top: 0; left: 0; display: block !important; width: 100%; padding: 22px; background: white; color: #111; font-family: Arial, sans-serif; }
-  .liqui-print-document h1 { margin: 0 0 8px; font-size: 20px; }
-  .liqui-print-document table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  .liqui-print-document th, .liqui-print-document td { border: 1px solid #777; padding: 6px; text-align: left; }
-  .liqui-print-document h2 { margin-top: 12px; text-align: right; }
+  .liqui-print-document { position: absolute; top: 0; left: 0; display: block !important; box-sizing: border-box; width: 100%; min-height: 100vh; margin: 0; padding: 18mm 17mm; background: #fff; color: #172b3b; font-family: Calibri, Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .liqui-print-heading { margin-bottom: 24px; border-bottom: 2px solid #dce7ef; padding-bottom: 15px; }
+  .liqui-print-heading > p { margin: 0 0 8px; color: #397ba9; font-size: 9px; font-weight: 700; letter-spacing: 1.5px; }
+  .liqui-print-heading h1 { margin: 0 0 5px; color: #172b3b; font-size: 25px; font-weight: 700; }
+  .liqui-print-heading > span { color: #60788b; font-size: 13px; }
+  .liqui-print-table-wrap { overflow: hidden; border: 1px solid #cddbe5; border-radius: 8px; }
+  .liqui-print-document table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+  .liqui-print-document thead { display: table-header-group; }
+  .liqui-print-document th { border-bottom: 1px solid #b9cbd8; background: #eff5f9; color: #36566f; font-size: 9px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+  .liqui-print-document th, .liqui-print-document td { border-right: 1px solid #e2eaf0; padding: 10px 9px; text-align: left; }
+  .liqui-print-document th:last-child, .liqui-print-document td:last-child { border-right: 0; }
+  .liqui-print-document td { border-bottom: 1px solid #e2eaf0; color: #243b4d; }
+  .liqui-print-document tbody tr:last-child td { border-bottom: 0; }
+  .liqui-print-document th:nth-child(n + 2), .liqui-print-document td:nth-child(n + 2) { text-align: right; white-space: nowrap; }
+  .liqui-print-document tr { break-inside: avoid; }
+  .liqui-print-document .liqui-print-deduction { color: #a33d49; }
+  .liqui-print-extra { margin-top: 22px; border: 1px solid #dce7ef; border-radius: 6px; padding: 12px 14px; break-inside: avoid; }
+  .liqui-print-extra h2 { margin: 0 0 7px; color: #36566f; font-size: 11px; }
+  .liqui-print-extra p { margin: 0; color: #354b5b; font-size: 10px; line-height: 1.5; white-space: pre-wrap; }
+  .liqui-print-total { display: grid; width: 100%; grid-template-columns: 1fr auto; align-items: center; column-gap: 24px; margin-top: 30px; border-top: 2px solid #dce7ef; padding-top: 15px; color: #172b3b; break-inside: avoid; }
+  .liqui-print-total span { justify-self: start; font-size: 13px; font-weight: 700; }
+  .liqui-print-total strong { justify-self: end; color: #286fa8; font-size: 19px; }
 }
 
 /* Personal novelty actions and compact create card */

@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-export type AppRole = "COORDINADOR" | "SUPERVISOR" | "JEFE";
+export type AppRole = "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE";
 
 export async function requireRole(allowedRoles: readonly AppRole[]) {
   const supabase = await createClient();
