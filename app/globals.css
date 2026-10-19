@@ -350,6 +350,19 @@ html[data-theme="light"] .notice-recipient-menu button.is-selected { background:
 .rango-modal-backdrop { display: block; }
 .rango-modal-backdrop .rango-modal-card { margin: 4vh auto; }
 .modal-card { width: min(100%, 520px); margin: auto; padding: 24px; box-shadow: 0 24px 80px rgb(0 0 0 / 55%); }
+.coordination-inline-error { margin: 14px 0 0; border: 1px solid #75434a; border-radius: 8px; background: #291b24; padding: 11px 13px; color: #ffb2ae; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+html[data-theme="light"] .coordination-inline-error { border-color: #ebc6c4; background: #fff2f0; color: #8f3439; }
+.coordination-error-backdrop { position: fixed; z-index: 140; inset: 0; display: grid; place-items: center; overflow-y: auto; background: rgb(2 8 15 / 74%); padding: 20px; backdrop-filter: blur(4px); }
+.coordination-error-modal { position: relative; display: grid; width: min(100%, 440px); justify-items: center; gap: 11px; border: 1px solid #38516b; border-radius: 14px; background: #0c1929; padding: 30px 26px 24px; text-align: center; box-shadow: 0 24px 75px rgb(0 0 0 / 55%); }
+.coordination-error-icon { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid #75434a; border-radius: 50%; background: #321e27; color: #ffb2ae; font-size: 23px; font-weight: 700; }
+.coordination-error-modal .eyebrow { margin: 3px 0 0; color: #9ab8d6; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.coordination-error-modal h2 { margin: 0; color: #edf4fc; font-size: 20px; font-weight: 650; }
+.coordination-error-modal > p:last-of-type { max-width: 360px; margin: 0; color: #b8c8d9; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+.coordination-error-modal > button { min-width: 120px; margin-top: 7px; }
+html[data-theme="light"] .coordination-error-modal { border-color: #d0dce7; background: #fff; }
+html[data-theme="light"] .coordination-error-modal h2 { color: #23364a; }
+html[data-theme="light"] .coordination-error-modal > p:last-of-type { color: #526980; }
+html[data-theme="light"] .coordination-error-icon { border-color: #ebc6c4; background: #fff2f0; color: #a43f43; }
 .nueva-coordinacion-modal { width: min(100%, 1120px); max-height: min(94vh, 1100px); overflow-y: auto; }
 .nueva-coordinacion-modal .nueva-coordinacion-form-modal > .back-link, .nueva-coordinacion-modal .nueva-coordinacion-form-modal > .page-heading { display: none; }
 .nueva-coordinacion-modal .coordination-form { max-width: none; border: 0; background: transparent; padding: 4px 0 0; box-shadow: none; }

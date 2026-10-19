@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { useCoordinacionesDemo, type NuevaCoordinacion } from "@/components/providers/demo-data-provider";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
@@ -78,9 +79,34 @@ export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales,
   if (!ready) return <EmptyState title="Cargando formulario" description="Estamos preparando las opciones de demostración." />;
   if (coordinacionId && !inicial) return <EmptyState title="No encontramos esa coordinación" description="Volvé al día seleccionado y abrí una coordinación de la lista." />;
 
-  async function guardar(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formulario = new FormData(event.currentTarget);
+  async function guardar(formularioElemento: HTMLFormElement) {
+    setError("");
+    const formulario = new FormData(formularioElemento);
+    const fecha = String(formulario.get("fecha") || "");
+    const ticket = String(formulario.get("ticket") || "").trim();
+    const camposObligatorios: [string, string][] = [
+      [fecha, "la fecha"],
+      [ticket, "el número de ticket"],
+      [String(formulario.get("cliente") || "").trim(), "el cliente"],
+      [String(formulario.get("tecnologia") || ""), "la tecnología"],
+      [String(formulario.get("categoria") || ""), "la categoría"],
+      [String(formulario.get("estado") || ""), "el estado"],
+    ];
+    const campoFaltante = camposObligatorios.find(([valor]) => !valor);
+    if (campoFaltante) {
+      setError(`Completá ${campoFaltante[1]} para guardar la coordinación.`);
+      return;
+    }
+    const duplicada = coordinaciones.find((item) => item.id !== inicial?.id
+      && item.fecha === fecha
+      && item.ticket.trim().toLocaleUpperCase("es") === ticket.toLocaleUpperCase("es"));
+    if (duplicada) {
+      const cuadrilla = duplicada.cuadrillaId
+        ? catalogos.cuadrillas.find((item) => item.id === duplicada.cuadrillaId)?.nombre ?? "desconocida"
+        : "sin cuadrilla asignada";
+      setError(`El TK ${duplicada.ticket} ya fue coordinado el ${new Date(`${duplicada.fecha}T00:00:00`).toLocaleDateString("es-AR")} en la cuadrilla ${cuadrilla}.`);
+      return;
+    }
     setGuardando(true);
     setError("");
     try {
@@ -134,7 +160,7 @@ export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales,
     <section className={onCancelar ? "nueva-coordinacion-form-modal" : undefined}>
       {!onCancelar && (<Link href={"/coordinaciones/" + fecha} className="back-link">← Volver a las coordinaciones</Link>)}
       {!onCancelar && (<PageHeading eyebrow={inicial ? "Editar coordinación" : "Nueva coordinación"} title={inicial ? "Editar " + inicial.ticket : "Cargar coordinación"} description="Completá los datos del caso. Los campos con * son obligatorios." />)}
-      <form ref={formularioRef} className="panel coordination-form" onSubmit={guardar} onChange={guardarBorrador}>
+      <form ref={formularioRef} className="panel coordination-form" noValidate onSubmit={(event) => { event.preventDefault(); void guardar(event.currentTarget); }} onChange={guardarBorrador}>
         <div className="form-grid">
           <label className="form-field">Fecha *<input type="date" name="fecha" defaultValue={inicial?.fecha ?? fecha} required /></label>
           <label className="form-field">Número de ticket *<input name="ticket" required defaultValue={inicial?.ticket ?? ""} placeholder="Ej.: 1234567" /></label>
@@ -150,8 +176,17 @@ export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales,
           <label className="form-field form-field-wide">Observaciones<textarea name="observaciones" rows={3} defaultValue={inicial?.observaciones ?? ""} placeholder="Información útil para la coordinación" /></label>
         </div>
         <fieldset className="extras-fieldset"><legend>Extras</legend><div className="extras-options">{extrasDisponibles.map((extra) => <label key={extra.id} className="extra-option"><input type="checkbox" name="extras" value={extra.id} defaultChecked={inicial?.extrasIds.includes(extra.id) ?? false} />{extra.nombre}</label>)}</div></fieldset>
-        {error && <p role="alert" className="m-0 text-sm text-rose-300">{error}</p>}
-        <div className="form-actions">{onCancelar ? <button className="button" type="button" onClick={onCancelar}>Cancelar</button> : <Link className="button" href={"/coordinaciones/" + fecha}>Cancelar</Link>}<button className="button button-primary" type="submit" disabled={guardando}>{guardando ? "Guardando…" : inicial ? "Guardar cambios" : "Guardar coordinación"}</button></div>
+        {error && <p className="coordination-inline-error" role="alert">{error}</p>}
+        {error && createPortal(<div className="coordination-error-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setError(""); }}>
+          <section className="panel coordination-error-modal" role="alertdialog" aria-modal="true" aria-labelledby="coordination-error-title" aria-describedby="coordination-error-description">
+            <span className="coordination-error-icon" aria-hidden="true">!</span>
+            <p className="eyebrow">AVISO DE COORDINACIÓN</p>
+            <h2 id="coordination-error-title">{error.includes("ya fue coordinado") ? "TK ya coordinado" : "No se pudo guardar"}</h2>
+            <p id="coordination-error-description">{error}</p>
+            <button className="button button-primary" type="button" onClick={() => setError("")}>Entendido</button>
+          </section>
+        </div>, document.body)}
+        <div className="form-actions">{onCancelar ? <button className="button" type="button" onClick={onCancelar}>Cancelar</button> : <Link className="button" href={"/coordinaciones/" + fecha}>Cancelar</Link>}<button className="button button-primary" type="button" disabled={guardando} onClick={() => { if (formularioRef.current) void guardar(formularioRef.current); }}>{guardando ? "Guardando…" : inicial ? "Guardar cambios" : "Guardar coordinación"}</button></div>
       </form>
     </section>
   );
