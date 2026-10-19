@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { CatalogOption } from "@/lib/demo-data/catalogs";
+import type { CatalogOption, ZonaCatalogOption } from "@/lib/demo-data/catalogs";
 
 export type DemoRole = "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE";
 export type ContextoUsuario = { id: string; nombre: string; rol: DemoRole };
@@ -21,7 +21,7 @@ export type CatalogoKey = "tercerizadas" | "cuadrillas" | "tecnologias" | "categ
 export type CuadrillaCatalogo = CatalogOption & { tercerizadaId: string };
 export type CatalogosDemo = {
   tercerizadas: CatalogOption[]; cuadrillas: CuadrillaCatalogo[]; tecnologias: CatalogOption[];
-  categorias: CatalogOption[]; horarios: CatalogOption[]; zonas: CatalogOption[];
+  categorias: CatalogOption[]; horarios: CatalogOption[]; zonas: ZonaCatalogOption[];
   estados: CatalogOption[]; extras: CatalogOption[];
 };
 export type UsuarioActual = { id: string; nombre: string; email: string };
@@ -183,7 +183,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         supabase.from("tecnologias").select("id,nombre,activo,orden").order("orden"),
         supabase.from("categorias").select("id,nombre,activo,orden").order("orden"),
         supabase.from("horarios").select("id,nombre,activo,orden").order("orden"),
-        supabase.from("zonas").select("id,nombre,activo,orden").order("orden"),
+        supabase.from("zonas").select("id,nombre,activo,orden,latitud,longitud").order("orden"),
         supabase.from("estados").select("id,nombre,activo,orden").order("orden"),
         supabase.from("extras").select("id,nombre,activo,orden").order("orden"),
         supabase.from("coordinaciones").select("id,fecha,ticket,cliente,tercerizada_id,cuadrilla_id,horario_id,tecnologia_id,categoria_id,observaciones,zona_id,estado_id,orden,ubicacion").order("fecha").order("created_at"),
@@ -227,7 +227,7 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
         tecnologias: (tecnologiasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
         categorias: (categoriasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
         horarios: (horariosQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
-        zonas: (zonasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
+        zonas: (zonasQ.data ?? []).map(({ id, nombre, activo, latitud, longitud }) => ({ id, nombre, activo, latitud, longitud })),
         estados: (estadosQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
         extras: (extrasQ.data ?? []).map(({ id, nombre, activo }) => ({ id, nombre, activo })),
       });
@@ -494,7 +494,9 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
       : [];
     const filas = tipo === "cuadrillas"
       ? (opciones as CuadrillaCatalogo[]).map((opcion, orden) => ({ id: opcion.id, nombre: opcion.nombre, tercerizada_id: opcion.tercerizadaId, activo: true, orden: (orden + 1) * 10 }))
-      : nuevas.map((opcion, orden) => ({ id: opcion.id, nombre: opcion.nombre, activo: true, orden: (orden + 1) * 10 }));
+      : tipo === "zonas"
+        ? (opciones as ZonaCatalogOption[]).map((opcion, orden) => ({ id: opcion.id, nombre: opcion.nombre, activo: true, orden: (orden + 1) * 10, latitud: opcion.latitud, longitud: opcion.longitud }))
+        : nuevas.map((opcion, orden) => ({ id: opcion.id, nombre: opcion.nombre, activo: true, orden: (orden + 1) * 10 }));
 
     const { error: saveError } = await supabase.from(tipo).upsert(filas as never[], { onConflict: "id" });
     lanzarError(saveError);

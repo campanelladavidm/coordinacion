@@ -9,10 +9,12 @@ import interactionPlugin from "@fullcalendar/interaction";
 import esLocale from "@fullcalendar/core/locales/es";
 import type { DayCellContentArg, DayCellMountArg } from "@fullcalendar/core";
 import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider";
+import { ZoneActivityMap } from "@/components/calendar/zone-activity-map";
 
 type UsuarioAviso = { id: string; nombre: string };
 type Aviso = { id: string; texto: string; desde: string; hasta: string };
 type FilaRadar = { fecha: string; zona_id: string | null; zona: string; cantidad: number };
+type FilaCategoriaRadar = { fecha: string; categoria_id: string; categoria: string; cantidad: number };
 const fechaHoy = () => {
   const ahora = new Date();
   return `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
@@ -41,7 +43,7 @@ function etiquetaSemana(lunes: Date) {
 
 export function CalendarView() {
   const router = useRouter();
-  const { fechasConCoordinaciones, feriados, ready, error, usuarioActual, usuarioEnContexto, rolDemo } = useCoordinacionesDemo();
+  const { fechasConCoordinaciones, feriados, ready, error, usuarioActual, usuarioEnContexto, rolDemo, catalogos } = useCoordinacionesDemo();
   const soloCalendario = rolDemo === "SOPORTE";
   const [usuarios, setUsuarios] = useState<UsuarioAviso[]>([]);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
@@ -60,8 +62,10 @@ export function CalendarView() {
   const [radarCargando, setRadarCargando] = useState(false);
   const [radarError, setRadarError] = useState("");
   const [radarFilas, setRadarFilas] = useState<FilaRadar[]>([]);
+  const [radarCategorias, setRadarCategorias] = useState<FilaCategoriaRadar[]>([]);
   const [radarInicio, setRadarInicio] = useState<Date | null>(null);
   const [zonaBuscada, setZonaBuscada] = useState("");
+  const [categoriaBuscada, setCategoriaBuscada] = useState("");
   const [mesMovil, setMesMovil] = useState(() => new Date(2026, 9, 1));
   const [hoyIso, setHoyIso] = useState("");
   const usuarioId = usuarioEnContexto?.id ?? usuarioActual?.id;
@@ -111,15 +115,32 @@ export function CalendarView() {
     const lunes = inicioDeSemanaActual();
     setRadarInicio(lunes);
     setZonaBuscada("");
+    setCategoriaBuscada("");
     setRadarFilas([]);
+    setRadarCategorias([]);
     setRadarError("");
     setRadarAbierto(true);
     setRadarCargando(true);
     try {
       const supabase = createClient();
-      const { data, error: errorRadar } = await supabase.rpc("radar_semanal", { p_semana_inicio: fechaIso(lunes) });
-      if (errorRadar) throw errorRadar;
-      setRadarFilas((data ?? []).map((fila) => ({ ...fila, cantidad: Number(fila.cantidad) || 0 })));
+      const [zonasResultado, categoriasResultado] = await Promise.all([
+        supabase.rpc("radar_semanal", { p_semana_inicio: fechaIso(lunes) }),
+        supabase.rpc("radar_categorias_semanal", { p_semana_inicio: fechaIso(lunes) }),
+      ]);
+      if (zonasResultado.error) throw zonasResultado.error;
+      if (categoriasResultado.error) throw categoriasResultado.error;
+      const filasZonas = (zonasResultado.data ?? []).map((fila) => ({ ...fila, cantidad: Number(fila.cantidad) || 0 }));
+      const filasCategorias = (categoriasResultado.data ?? []).map((fila) => ({ ...fila, cantidad: Number(fila.cantidad) || 0 }));
+      setRadarFilas(filasZonas);
+      setRadarCategorias(filasCategorias);
+      const zonaConMasActividad = Array.from(new Map(filasZonas.filter((fila) => fila.zona_id).map((fila) => [fila.zona_id!, fila.zona])).entries())
+        .map(([id, nombre]) => ({ id, nombre, cantidad: filasZonas.filter((fila) => fila.zona_id === id).reduce((total, fila) => total + fila.cantidad, 0) }))
+        .sort((a, b) => b.cantidad - a.cantidad)[0];
+      const categoriaConMasActividad = Array.from(new Map(filasCategorias.map((fila) => [fila.categoria_id, fila.categoria])).entries())
+        .map(([id, nombre]) => ({ id, nombre, cantidad: filasCategorias.filter((fila) => fila.categoria_id === id).reduce((total, fila) => total + fila.cantidad, 0) }))
+        .sort((a, b) => b.cantidad - a.cantidad)[0];
+      setZonaBuscada(zonaConMasActividad?.nombre ?? "");
+      setCategoriaBuscada(categoriaConMasActividad?.nombre ?? "");
     } catch (cause) {
       setRadarError(cause instanceof Error ? cause.message : "No se pudo cargar el radar semanal.");
     } finally {
@@ -192,12 +213,23 @@ export function CalendarView() {
   const tituloMesMovil = tituloDelMes(mesMovil);
   const diasRadar = radarInicio ? Array.from({ length: 7 }, (_, indice) => new Date(radarInicio.getFullYear(), radarInicio.getMonth(), radarInicio.getDate() + indice)) : [];
   const totalesPorDia = diasRadar.map((dia) => ({ fecha: fechaIso(dia), dia, cantidad: radarFilas.filter((fila) => fila.fecha === fechaIso(dia)).reduce((total, fila) => total + fila.cantidad, 0) }));
-  const zonasRadar = Array.from(new Map(radarFilas.filter((fila) => fila.zona_id).map((fila) => [fila.zona_id!, fila.zona])).entries()).map(([id, nombre]) => ({ id, nombre, cantidad: radarFilas.filter((fila) => fila.zona_id === id).reduce((total, fila) => total + fila.cantidad, 0) }));
+  const zonasRadar = Array.from(new Map(radarFilas.filter((fila) => fila.zona_id).map((fila) => [fila.zona_id!, fila.zona])).entries()).map(([id, nombre]) => {
+    const zona = catalogos.zonas.find((item) => item.id === id);
+    return { id, nombre, cantidad: radarFilas.filter((fila) => fila.zona_id === id).reduce((total, fila) => total + fila.cantidad, 0), latitud: zona?.latitud ?? null, longitud: zona?.longitud ?? null };
+  });
   const zonasDestacadas = [...zonasRadar].filter((zona) => zona.cantidad > 0).sort((a, b) => b.cantidad - a.cantidad).slice(0, 5);
   const zonaSeleccionada = zonasRadar.find((zona) => zona.nombre.toLocaleLowerCase("es-AR") === zonaBuscada.trim().toLocaleLowerCase("es-AR"));
   const zonaDias = zonaSeleccionada ? diasRadar.map((dia) => ({ dia, fecha: fechaIso(dia), cantidad: radarFilas.find((fila) => fila.zona_id === zonaSeleccionada.id && fila.fecha === fechaIso(dia))?.cantidad ?? 0 })) : [];
-  const maximoDia = Math.max(1, ...totalesPorDia.map((dia) => dia.cantidad));
+  const categoriasRadar = Array.from(new Map(radarCategorias.map((fila) => [fila.categoria_id, fila.categoria])).entries()).map(([id, nombre]) => ({ id, nombre, cantidad: radarCategorias.filter((fila) => fila.categoria_id === id).reduce((total, fila) => total + fila.cantidad, 0) }));
+  const categoriasDestacadas = [...categoriasRadar].filter((categoria) => categoria.cantidad > 0).sort((a, b) => b.cantidad - a.cantidad).slice(0, 5);
+  const categoriaSeleccionada = categoriasRadar.find((categoria) => categoria.nombre.toLocaleLowerCase("es-AR") === categoriaBuscada.trim().toLocaleLowerCase("es-AR"));
+  const categoriaDias = categoriaSeleccionada ? diasRadar.map((dia) => ({ dia, fecha: fechaIso(dia), cantidad: radarCategorias.find((fila) => fila.categoria_id === categoriaSeleccionada.id && fila.fecha === fechaIso(dia))?.cantidad ?? 0 })) : [];
   const maximoZona = Math.max(1, ...zonasDestacadas.map((zona) => zona.cantidad));
+  const maximoCategoria = Math.max(1, ...categoriasDestacadas.map((categoria) => categoria.cantidad));
+  const zonasConCoordenadas = zonasRadar.filter((zona) => zona.latitud !== null && zona.longitud !== null);
+  const puntosMapa = zonasConCoordenadas.map((zona) => ({ id: zona.id, name: zona.nombre, latitude: zona.latitud!, longitude: zona.longitud!, count: zona.cantidad }));
+  const totalZonaSeleccionada = zonaDias.reduce((total, dia) => total + dia.cantidad, 0);
+  const totalCategoriaSeleccionada = categoriaDias.reduce((total, dia) => total + dia.cantidad, 0);
 
   return (
     <div className="panel calendar-panel">
@@ -232,9 +264,11 @@ export function CalendarView() {
 
       {radarAbierto && <div className="radar-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRadarAbierto(false); }}><section className="radar-modal" role="dialog" aria-modal="true" aria-labelledby="radar-title"><header className="radar-heading"><div><p className="eyebrow">PLANIFICACIÓN SEMANAL</p><h2 id="radar-title">Radar semanal</h2><p className="radar-subtitle">Semana actual · {radarInicio ? etiquetaSemana(radarInicio) : ""}</p></div><button type="button" className="radar-close" aria-label="Cerrar radar" onClick={() => setRadarAbierto(false)}>×</button></header>
         {radarCargando ? <div className="radar-message" role="status">Actualizando datos de esta semana…</div> : radarError ? <div className="radar-message radar-error" role="alert">No se pudo cargar el radar. {radarError}</div> : <>
-          <div className="radar-day-grid" aria-label="Coordinaciones de lunes a domingo">{totalesPorDia.map(({ fecha, dia, cantidad }) => <article className={`radar-day-card${fecha === hoyIso ? " is-today" : ""}`} key={fecha}><span>{new Intl.DateTimeFormat("es-AR", { weekday: "long" }).format(dia)}</span><strong>{cantidad}</strong><small>{cantidad === 1 ? "coordinación" : "coordinaciones"}</small></article>)}</div>
-          <div className="radar-content-grid"><section className="radar-section"><h3>Zonas con más actividad</h3><p>Las cinco zonas con más coordinaciones en la semana.</p>{zonasDestacadas.length ? <ol className="radar-zone-list">{zonasDestacadas.map((zona) => <li key={zona.id}><span>{zona.nombre}</span><i><b style={{ width: `${Math.max(5, zona.cantidad / maximoZona * 100)}%` }} /></i><strong>{zona.cantidad}</strong></li>)}</ol> : <div className="radar-empty">Todavía no hay coordinaciones cargadas para esta semana.</div>}</section>
-          <section className="radar-section"><h3>Buscar una zona</h3><p>Consultá la actividad de cualquier zona.</p><input className="radar-search" list="radar-zonas" value={zonaBuscada} onChange={(event) => setZonaBuscada(event.target.value)} placeholder="Escribí o elegí una zona" /><datalist id="radar-zonas">{zonasRadar.map((zona) => <option key={zona.id} value={zona.nombre} />)}</datalist>{zonaSeleccionada ? <div className="radar-zone-detail"><strong>{zonaSeleccionada.nombre}</strong><div>{zonaDias.map(({ fecha, dia, cantidad }) => <div key={fecha} className="radar-zone-day"><span>{new Intl.DateTimeFormat("es-AR", { weekday: "short" }).format(dia)}</span><i><b style={{ width: `${cantidad ? Math.max(5, cantidad / maximoDia * 100) : 0}%` }} /></i><strong>{cantidad}</strong></div>)}</div></div> : <div className="radar-hint">Elegí una zona para ver su actividad día por día.</div>}</section></div>
+          <div className="radar-content-grid"><section className="radar-section"><h3>Zonas con más actividad</h3><p>Las cinco zonas con más coordinaciones en la semana.</p>{zonasDestacadas.length ? <ol className="radar-zone-list">{zonasDestacadas.map((zona, indice) => <li key={zona.id} className={zona.id === zonaSeleccionada?.id ? "is-selected" : ""}><span className="radar-rank">{indice + 1}</span><span className="radar-rank-name">{zona.nombre}</span><i><b style={{ width: `${Math.max(5, zona.cantidad / maximoZona * 100)}%` }} /></i><strong>{zona.cantidad}</strong></li>)}</ol> : <div className="radar-empty">Todavía no hay coordinaciones cargadas para esta semana.</div>}</section>
+          <section className="radar-section"><h3>Buscar una zona</h3><p>Consultá la actividad de cualquier zona.</p><input className="radar-search" list="radar-zonas" value={zonaBuscada} onChange={(event) => setZonaBuscada(event.target.value)} placeholder="Buscá una zona, por ejemplo Guaymallén" /><datalist id="radar-zonas">{zonasRadar.map((zona) => <option key={zona.id} value={zona.nombre} />)}</datalist>{zonaSeleccionada ? <div className="radar-zone-detail"><div className="radar-selected-heading"><strong><i />{zonaSeleccionada.nombre}</strong><span>Total semanal: {totalZonaSeleccionada}</span></div><div className="radar-week-strip">{zonaDias.map(({ fecha, dia, cantidad }) => <div key={fecha}><span>{new Intl.DateTimeFormat("es-AR", { weekday: "short" }).format(dia)}</span><small>{new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short" }).format(dia)}</small><strong>{cantidad}</strong></div>)}</div></div> : <div className="radar-hint">Elegí una zona para ver su actividad día por día.</div>}</section></div>
+          <ZoneActivityMap points={puntosMapa} selectedZoneId={zonaSeleccionada?.id ?? null} onSelectZone={(id) => { const zona = zonasRadar.find((item) => item.id === id); if (zona) setZonaBuscada(zona.nombre); }} />
+          <div className="radar-content-grid"><section className="radar-section"><h3>Categorías con más actividad</h3><p>Las cinco categorías con más coordinaciones en la semana.</p>{categoriasDestacadas.length ? <ol className="radar-zone-list">{categoriasDestacadas.map((categoria, indice) => <li key={categoria.id} className={categoria.id === categoriaSeleccionada?.id ? "is-selected" : ""}><span className="radar-rank">{indice + 1}</span><span className="radar-rank-name">{categoria.nombre}</span><i><b style={{ width: `${Math.max(5, categoria.cantidad / maximoCategoria * 100)}%` }} /></i><strong>{categoria.cantidad}</strong></li>)}</ol> : <div className="radar-empty">Todavía no hay coordinaciones cargadas para esta semana.</div>}</section>
+          <section className="radar-section"><h3>Buscar una categoría</h3><p>Consultá la actividad de cualquier categoría.</p><input className="radar-search" list="radar-categorias" value={categoriaBuscada} onChange={(event) => setCategoriaBuscada(event.target.value)} placeholder="Buscá una categoría" /><datalist id="radar-categorias">{categoriasRadar.map((categoria) => <option key={categoria.id} value={categoria.nombre} />)}</datalist>{categoriaSeleccionada ? <div className="radar-zone-detail"><div className="radar-selected-heading"><strong><i />{categoriaSeleccionada.nombre}</strong><span>Total semanal: {totalCategoriaSeleccionada}</span></div><div className="radar-week-strip">{categoriaDias.map(({ fecha, dia, cantidad }) => <div key={fecha}><span>{new Intl.DateTimeFormat("es-AR", { weekday: "short" }).format(dia)}</span><small>{new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short" }).format(dia)}</small><strong>{cantidad}</strong></div>)}</div></div> : <div className="radar-hint">Elegí una categoría para ver su actividad día por día.</div>}</section></div>
         </>}
       </section></div>}
 

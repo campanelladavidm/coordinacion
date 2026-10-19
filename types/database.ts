@@ -18,7 +18,7 @@ export type Database = {
       tecnologias: Table<CatalogRow, CatalogInsert>;
       categorias: Table<CatalogRow, CatalogInsert>;
       horarios: Table<CatalogRow, CatalogInsert>;
-      zonas: Table<CatalogRow, CatalogInsert>;
+      zonas: Table<CatalogRow & { latitud: number | null; longitud: number | null }, CatalogInsert & { latitud?: number | null; longitud?: number | null }>;
       estados: Table<CatalogRow, CatalogInsert>;
       extras: Table<CatalogRow, CatalogInsert>;
       coordinaciones: Table<
@@ -67,6 +67,7 @@ export type Database = {
       reordenar_coordinaciones: { Args: { p_ids: string[] }; Returns: undefined };
       asignar_coordinaciones_a_cuadrilla: { Args: { p_ids: string[]; p_cuadrilla_id: string }; Returns: undefined };
       radar_semanal: { Args: { p_semana_inicio: string }; Returns: { fecha: string; zona_id: string | null; zona: string; cantidad: number }[] };
+      radar_categorias_semanal: { Args: { p_semana_inicio: string }; Returns: { fecha: string; categoria_id: string; categoria: string; cantidad: number }[] };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

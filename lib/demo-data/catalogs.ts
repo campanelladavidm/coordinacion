@@ -1,4 +1,5 @@
 export type CatalogOption = { id: string; nombre: string; activo?: boolean };
+export type ZonaCatalogOption = CatalogOption & { latitud: number | null; longitud: number | null };
 
 export const tercerizadas: CatalogOption[] = [
   { id: "atinet", nombre: "Atinet" },

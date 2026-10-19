@@ -7,7 +7,7 @@ import {
   type CatalogosDemo,
   type CuadrillaCatalogo,
 } from "@/components/providers/demo-data-provider";
-import type { CatalogOption } from "@/lib/demo-data/catalogs";
+import type { CatalogOption, ZonaCatalogOption } from "@/lib/demo-data/catalogs";
 
 const titulos: Record<CatalogoKey, string> = {
   tercerizadas: "Tercerizadas",
@@ -32,6 +32,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
   const { catalogos, coordinaciones, custodias, guardarCatalogo } = useCoordinacionesDemo();
   const [nombre, setNombre] = useState("");
   const [tercerizadaId, setTercerizadaId] = useState("");
+  const [coordenadas, setCoordenadas] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -40,6 +41,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
   const tercerizadasActivas = catalogos.tercerizadas.filter((empresa) => empresa.activo !== false);
   const esCuadrilla = tipo === "cuadrillas";
   const esTercerizada = tipo === "tercerizadas";
+  const esZona = tipo === "zonas";
 
   function referencias(id: string) {
     if (tipo === "tercerizadas") {
@@ -75,6 +77,28 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
       setMensaje("Elegí la tercerizada a la que pertenece la cuadrilla.");
       return;
     }
+    const textoCoordenadas = coordenadas.trim();
+    const partesCoordenadas = textoCoordenadas ? textoCoordenadas.split(",") : [];
+    if (esZona && textoCoordenadas && partesCoordenadas.length !== 2) {
+      setMensaje("Ingresá las coordenadas con el formato latitud, longitud.");
+      return;
+    }
+    const latitudTexto = partesCoordenadas[0]?.trim() ?? "";
+    const longitudTexto = partesCoordenadas[1]?.trim() ?? "";
+    const latitudNumero = textoCoordenadas ? Number(latitudTexto) : null;
+    const longitudNumero = textoCoordenadas ? Number(longitudTexto) : null;
+    if (esZona && textoCoordenadas && (!latitudTexto || !longitudTexto || !Number.isFinite(latitudNumero) || !Number.isFinite(longitudNumero))) {
+      setMensaje("Las coordenadas deben ser dos números separados por una coma.");
+      return;
+    }
+    if (esZona && latitudNumero !== null && (latitudNumero < -90 || latitudNumero > 90)) {
+      setMensaje("La latitud debe estar entre -90 y 90.");
+      return;
+    }
+    if (esZona && longitudNumero !== null && (longitudNumero < -180 || longitudNumero > 180)) {
+      setMensaje("La longitud debe estar entre -180 y 180.");
+      return;
+    }
 
     let siguientes: CatalogOption[];
     if (editandoId) {
@@ -82,18 +106,27 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
         if (opcion.id !== editandoId) return opcion;
         return esCuadrilla
           ? { ...opcion, nombre: nombreLimpio, tercerizadaId } as CuadrillaCatalogo
+          : esZona
+            ? { ...opcion, nombre: nombreLimpio, latitud: latitudNumero, longitud: longitudNumero } as ZonaCatalogOption
           : { ...opcion, nombre: nombreLimpio };
       });
     } else {
       const archivada = todasLasOpciones.find((opcion) => opcion.activo === false && compararTexto(opcion.nombre) === compararTexto(nombreLimpio));
-      const nueva = archivada ? { ...archivada, nombre: nombreLimpio, activo: true } : { id: crearId(), nombre: nombreLimpio, activo: true };
-      siguientes = esCuadrilla ? [...opciones, { ...nueva, tercerizadaId } as CuadrillaCatalogo] : [...opciones, nueva];
+      const nueva = archivada
+        ? { ...archivada, nombre: nombreLimpio, activo: true }
+        : { id: crearId(), nombre: nombreLimpio, activo: true };
+      siguientes = esCuadrilla
+        ? [...opciones, { ...nueva, tercerizadaId } as CuadrillaCatalogo]
+        : esZona
+          ? [...opciones, { ...nueva, latitud: latitudNumero ?? (archivada ? (archivada as ZonaCatalogOption).latitud : null), longitud: longitudNumero ?? (archivada ? (archivada as ZonaCatalogOption).longitud : null) } as ZonaCatalogOption]
+          : [...opciones, nueva];
     }
     setGuardando(true);
     try {
       await guardarOpciones(siguientes);
       setNombre("");
       setTercerizadaId("");
+      setCoordenadas("");
       setEditandoId(null);
       setMensaje(editandoId ? "Cambios guardados." : "Elemento agregado.");
     } catch (cause) {
@@ -107,6 +140,8 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
     setEditandoId(opcion.id);
     setNombre(opcion.nombre);
     setTercerizadaId(esCuadrilla ? (opcion as CuadrillaCatalogo).tercerizadaId : "");
+    const zona = opcion as ZonaCatalogOption;
+    setCoordenadas(esZona && zona.latitud !== null && zona.longitud !== null ? `${zona.latitud}, ${zona.longitud}` : "");
     setMensaje("");
   }
 
@@ -114,6 +149,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
     setEditandoId(null);
     setNombre("");
     setTercerizadaId("");
+    setCoordenadas("");
     setMensaje("");
   }
 
@@ -141,6 +177,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
         <div className="min-w-0">
           <strong className={`block truncate text-sm font-medium text-slate-200 ${esCuadrilla || esTercerizada ? "uppercase tracking-wide" : ""}`}>{opcion.nombre}</strong>
           {empresa && <span className="mt-1 block text-xs text-slate-400">{empresa}</span>}
+          {esZona && ((opcion as ZonaCatalogOption).latitud !== null || (opcion as ZonaCatalogOption).longitud !== null) && <span className="mt-1 block text-xs text-slate-400">Lat. {(opcion as ZonaCatalogOption).latitud ?? "—"} · Long. {(opcion as ZonaCatalogOption).longitud ?? "—"}</span>}
           {esTercerizada && <span className="mt-1 block text-xs text-slate-400">{cuadrillas.filter((item) => item.tercerizadaId === opcion.id).length} cuadrillas</span>}
           {uso > 0 && <span className="mt-1 block text-xs text-slate-500">En uso: {uso}</span>}
         </div>
@@ -155,7 +192,7 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
   const cuadrillas = catalogos.cuadrillas.filter((cuadrilla) => cuadrilla.activo !== false);
   return (
     <div className="catalog-manager grid gap-4">
-      <form className="panel grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(180px,0.7fr)_auto] sm:items-end" onSubmit={guardar}>
+      <form className={`panel grid gap-3 p-5 ${esZona ? "sm:grid-cols-[minmax(0,1fr)_minmax(260px,1fr)_auto] sm:items-end" : "sm:grid-cols-[minmax(0,1fr)_minmax(180px,0.7fr)_auto] sm:items-end"}`} onSubmit={guardar}>
           <label className="form-field mt-0">{editandoId ? "Editar nombre" : "Nuevo elemento"}
             <input value={nombre} onChange={(event) => setNombre(event.target.value)} maxLength={100} required placeholder={`Nombre de ${titulos[tipo].toLocaleLowerCase("es")}`} />
           </label>
@@ -166,6 +203,8 @@ export function CatalogManager({ tipo }: { tipo: CatalogoKey }) {
                 {tercerizadasActivas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nombre}</option>)}
               </select>
             </label>
+          ) : esZona ? (
+            <label className="form-field mt-0">Coordenadas (latitud, longitud)<input type="text" inputMode="decimal" value={coordenadas} onChange={(event) => setCoordenadas(event.target.value)} placeholder="-32.90874945971554, -68.82752962586522" /></label>
           ) : <span className="hidden sm:block" />}
           <div className="flex gap-2">
             <button className="button button-primary" type="submit" disabled={guardando}>{guardando ? "Guardando…" : editandoId ? "Guardar" : "Agregar"}</button>
