@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { createClient } from "@/lib/supabase/client";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -11,6 +12,7 @@ import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider
 
 type UsuarioAviso = { id: string; nombre: string };
 type Aviso = { id: string; texto: string; desde: string; hasta: string };
+type FilaRadar = { fecha: string; zona_id: string | null; zona: string; cantidad: number };
 const fechaHoy = () => {
   const ahora = new Date();
   return `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
@@ -21,6 +23,20 @@ function fechaDeCelda(fecha: Date) {
 function tituloDelMes(fecha: Date) {
   const mes = new Intl.DateTimeFormat("es-AR", { month: "long" }).format(fecha);
   return `${mes.charAt(0).toLocaleUpperCase("es-AR")}${mes.slice(1)} ${fecha.getFullYear()}`;
+}
+function inicioDeSemanaActual(fecha = new Date()) {
+  const lunes = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+  lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
+  return lunes;
+}
+function fechaIso(fecha: Date) {
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+}
+function etiquetaSemana(lunes: Date) {
+  const domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
+  const inicio = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long" }).format(lunes);
+  const fin = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" }).format(domingo);
+  return `${inicio} al ${fin}`;
 }
 
 export function CalendarView() {
@@ -40,6 +56,12 @@ export function CalendarView() {
   const [errorAviso, setErrorAviso] = useState("");
   const [cerrando, setCerrando] = useState<string | null>(null);
   const [indiceAviso, setIndiceAviso] = useState(0);
+  const [radarAbierto, setRadarAbierto] = useState(false);
+  const [radarCargando, setRadarCargando] = useState(false);
+  const [radarError, setRadarError] = useState("");
+  const [radarFilas, setRadarFilas] = useState<FilaRadar[]>([]);
+  const [radarInicio, setRadarInicio] = useState<Date | null>(null);
+  const [zonaBuscada, setZonaBuscada] = useState("");
   const [mesMovil, setMesMovil] = useState(() => new Date(2026, 9, 1));
   const [hoyIso, setHoyIso] = useState("");
   const usuarioId = usuarioEnContexto?.id ?? usuarioActual?.id;
@@ -73,9 +95,36 @@ export function CalendarView() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!radarAbierto) return;
+    const cerrarConEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setRadarAbierto(false); };
+    window.addEventListener("keydown", cerrarConEscape);
+    return () => window.removeEventListener("keydown", cerrarConEscape);
+  }, [radarAbierto]);
+
   function abrirFormulario() {
     const hoy = fechaHoy();
     setDesde(hoy); setHasta(hoy); setTexto(""); setDestinatarios([]); setTodoElEquipo(true); setDestinatariosAbiertos(false); setErrorAviso(""); setModal(true);
+  }
+
+  async function abrirRadar() {
+    const lunes = inicioDeSemanaActual();
+    setRadarInicio(lunes);
+    setZonaBuscada("");
+    setRadarFilas([]);
+    setRadarError("");
+    setRadarAbierto(true);
+    setRadarCargando(true);
+    try {
+      const supabase = createClient();
+      const { data, error: errorRadar } = await supabase.rpc("radar_semanal", { p_semana_inicio: fechaIso(lunes) });
+      if (errorRadar) throw errorRadar;
+      setRadarFilas((data ?? []).map((fila) => ({ ...fila, cantidad: Number(fila.cantidad) || 0 })));
+    } catch (cause) {
+      setRadarError(cause instanceof Error ? cause.message : "No se pudo cargar el radar semanal.");
+    } finally {
+      setRadarCargando(false);
+    }
   }
 
   function quitarAvisoDeLaVista(id: string) {
@@ -141,6 +190,14 @@ export function CalendarView() {
   const cantidadDiasMovil = Math.ceil((offsetMesMovil + diasEnMesMovil) / 7) * 7;
   const diasMovil = Array.from({ length: cantidadDiasMovil }, (_, index) => new Date(mesMovil.getFullYear(), mesMovil.getMonth(), index - offsetMesMovil + 1));
   const tituloMesMovil = tituloDelMes(mesMovil);
+  const diasRadar = radarInicio ? Array.from({ length: 7 }, (_, indice) => new Date(radarInicio.getFullYear(), radarInicio.getMonth(), radarInicio.getDate() + indice)) : [];
+  const totalesPorDia = diasRadar.map((dia) => ({ fecha: fechaIso(dia), dia, cantidad: radarFilas.filter((fila) => fila.fecha === fechaIso(dia)).reduce((total, fila) => total + fila.cantidad, 0) }));
+  const zonasRadar = Array.from(new Map(radarFilas.filter((fila) => fila.zona_id).map((fila) => [fila.zona_id!, fila.zona])).entries()).map(([id, nombre]) => ({ id, nombre, cantidad: radarFilas.filter((fila) => fila.zona_id === id).reduce((total, fila) => total + fila.cantidad, 0) }));
+  const zonasDestacadas = [...zonasRadar].filter((zona) => zona.cantidad > 0).sort((a, b) => b.cantidad - a.cantidad).slice(0, 5);
+  const zonaSeleccionada = zonasRadar.find((zona) => zona.nombre.toLocaleLowerCase("es-AR") === zonaBuscada.trim().toLocaleLowerCase("es-AR"));
+  const zonaDias = zonaSeleccionada ? diasRadar.map((dia) => ({ dia, fecha: fechaIso(dia), cantidad: radarFilas.find((fila) => fila.zona_id === zonaSeleccionada.id && fila.fecha === fechaIso(dia))?.cantidad ?? 0 })) : [];
+  const maximoDia = Math.max(1, ...totalesPorDia.map((dia) => dia.cantidad));
+  const maximoZona = Math.max(1, ...zonasDestacadas.map((zona) => zona.cantidad));
 
   return (
     <div className="panel calendar-panel">
@@ -148,10 +205,8 @@ export function CalendarView() {
         <div className="calendar-mobile-view">
           <div className="calendar-mobile-heading"><h2>{tituloMesMovil}</h2></div>
           <div className="calendar-mobile-controls">
-            <div className="calendar-mobile-month-nav"><button type="button" aria-label="Mes anterior" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Mes siguiente" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() + 1, 1))}>›</button><button type="button" onClick={() => setMesMovil(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Hoy</button></div>
-            <button type="button" className="calendar-mobile-new-notice" onClick={abrirFormulario}>Nuevo aviso</button>
-          </div>
-          <div className="calendar-mobile-grid" role="grid" aria-label={`Calendario de ${tituloMesMovil}`}>
+            <div className="calendar-mobile-month-nav"><button type="button" aria-label="Mes anterior" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Mes siguiente" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() + 1, 1))}>›</button><button type="button" onClick={() => setMesMovil(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Hoy</button><button type="button" className="calendar-mobile-radar" onClick={() => void abrirRadar()}>Radar semanal</button><button type="button" className="calendar-mobile-new-notice" onClick={abrirFormulario}>Nuevo aviso</button></div>
+          </div><div className="calendar-mobile-grid" role="grid" aria-label={`Calendario de ${tituloMesMovil}`}>
             {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((dia) => <div key={dia} className="calendar-mobile-weekday" role="columnheader">{dia}</div>)}
             {diasMovil.map((dia) => {
               const iso = fechaDeCelda(dia);
@@ -163,7 +218,7 @@ export function CalendarView() {
             })}
           </div>
         </div>
-        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="100%" expandRows headerToolbar={{ left: "prev,next today nuevoAviso", center: "title", right: "" }} titleFormat={(arg) => tituloDelMes(new Date(arg.date.year, arg.date.month, 1))} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={soloCalendario ? undefined : (info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
+        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="auto" expandRows headerToolbar={{ left: "prev,next today radarSemanal", center: "title", right: "nuevoAviso" }} titleFormat={(arg) => tituloDelMes(new Date(arg.date.year, arg.date.month, 1))} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario }, radarSemanal: { text: "Radar semanal", click: () => void abrirRadar() } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={soloCalendario ? undefined : (info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
       </div>
       <div className="calendar-footer">
         <div className="calendar-note">{error ? `Error de conexión: ${error}` : ready ? "Datos guardados en Supabase." : "Cargando calendario…"}</div>
@@ -174,6 +229,14 @@ export function CalendarView() {
           <span><i className="calendar-legend-dot calendar-legend-today" />Hoy</span>
         </div>
       </div>
+
+      {radarAbierto && <div className="radar-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRadarAbierto(false); }}><section className="radar-modal" role="dialog" aria-modal="true" aria-labelledby="radar-title"><header className="radar-heading"><div><p className="eyebrow">PLANIFICACIÓN SEMANAL</p><h2 id="radar-title">Radar semanal</h2><p className="radar-subtitle">Semana actual · {radarInicio ? etiquetaSemana(radarInicio) : ""}</p></div><button type="button" className="radar-close" aria-label="Cerrar radar" onClick={() => setRadarAbierto(false)}>×</button></header>
+        {radarCargando ? <div className="radar-message" role="status">Actualizando datos de esta semana…</div> : radarError ? <div className="radar-message radar-error" role="alert">No se pudo cargar el radar. {radarError}</div> : <>
+          <div className="radar-day-grid" aria-label="Coordinaciones de lunes a domingo">{totalesPorDia.map(({ fecha, dia, cantidad }) => <article className={`radar-day-card${fecha === hoyIso ? " is-today" : ""}`} key={fecha}><span>{new Intl.DateTimeFormat("es-AR", { weekday: "long" }).format(dia)}</span><strong>{cantidad}</strong><small>{cantidad === 1 ? "coordinación" : "coordinaciones"}</small></article>)}</div>
+          <div className="radar-content-grid"><section className="radar-section"><h3>Zonas con más actividad</h3><p>Las cinco zonas con más coordinaciones en la semana.</p>{zonasDestacadas.length ? <ol className="radar-zone-list">{zonasDestacadas.map((zona) => <li key={zona.id}><span>{zona.nombre}</span><i><b style={{ width: `${Math.max(5, zona.cantidad / maximoZona * 100)}%` }} /></i><strong>{zona.cantidad}</strong></li>)}</ol> : <div className="radar-empty">Todavía no hay coordinaciones cargadas para esta semana.</div>}</section>
+          <section className="radar-section"><h3>Buscar una zona</h3><p>Consultá la actividad de cualquier zona.</p><input className="radar-search" list="radar-zonas" value={zonaBuscada} onChange={(event) => setZonaBuscada(event.target.value)} placeholder="Escribí o elegí una zona" /><datalist id="radar-zonas">{zonasRadar.map((zona) => <option key={zona.id} value={zona.nombre} />)}</datalist>{zonaSeleccionada ? <div className="radar-zone-detail"><strong>{zonaSeleccionada.nombre}</strong><div>{zonaDias.map(({ fecha, dia, cantidad }) => <div key={fecha} className="radar-zone-day"><span>{new Intl.DateTimeFormat("es-AR", { weekday: "short" }).format(dia)}</span><i><b style={{ width: `${cantidad ? Math.max(5, cantidad / maximoDia * 100) : 0}%` }} /></i><strong>{cantidad}</strong></div>)}</div></div> : <div className="radar-hint">Elegí una zona para ver su actividad día por día.</div>}</section></div>
+        </>}
+      </section></div>}
 
       {avisoActual && <aside className="calendar-alert" key={avisoActual.id} role="status"><p>{avisoActual.texto}</p><div className="calendar-alert-controls">{avisos.length > 1 && <button type="button" aria-label="Aviso anterior" title="Aviso anterior" onClick={() => setIndiceAviso((actual) => (actual - 1 + avisos.length) % avisos.length)}>‹</button>}<span className="calendar-alert-counter">{indiceAviso + 1} de {avisos.length}</span>{avisos.length > 1 && <button type="button" aria-label="Aviso siguiente" title="Aviso siguiente" onClick={() => setIndiceAviso((actual) => (actual + 1) % avisos.length)}>›</button>}<button type="button" aria-label="Ocultar hasta volver a entrar al calendario" title="Ocultar hasta volver a entrar al calendario" onClick={() => quitarAvisoDeLaVista(avisoActual.id)}>−</button><button type="button" aria-label="Cerrar aviso hasta su fecha de vencimiento" title="Cerrar definitivamente hasta su vencimiento" disabled={cerrando === avisoActual.id} onClick={() => void ocultarDefinitivamente(avisoActual.id)}>×</button></div></aside>}
 

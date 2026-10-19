@@ -66,6 +66,7 @@ export type Database = {
       obtener_uso_base_datos_bytes: { Args: Record<string, never>; Returns: number };
       reordenar_coordinaciones: { Args: { p_ids: string[] }; Returns: undefined };
       asignar_coordinaciones_a_cuadrilla: { Args: { p_ids: string[]; p_cuadrilla_id: string }; Returns: undefined };
+      radar_semanal: { Args: { p_semana_inicio: string }; Returns: { fecha: string; zona_id: string | null; zona: string; cantidad: number }[] };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
