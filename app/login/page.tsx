@@ -35,7 +35,7 @@ export default function LoginPage() {
       <Link href="/login" className="back-link">Acceso interno</Link>
       <div className="panel auth-card">
         <PageHeading eyebrow="Acceso interno" title="Iniciar sesión" description="Ingresá con tu cuenta de Coordinaciones WN." />
-        <form onSubmit={iniciarSesion}>
+        <form method="post" onSubmit={iniciarSesion}>
           <label className="form-field">Correo electrónico<input type="email" name="email" autoComplete="username" placeholder="nombre@empresa.com" required /></label>
           <label className="form-field">Contraseña<input type="password" name="password" autoComplete="current-password" placeholder="Tu contraseña" required /></label>
           {error && <p className="mt-4 text-sm text-rose-300" role="alert">{error}</p>}

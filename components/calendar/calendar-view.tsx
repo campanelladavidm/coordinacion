@@ -212,7 +212,6 @@ export function CalendarView() {
   const diasMovil = Array.from({ length: cantidadDiasMovil }, (_, index) => new Date(mesMovil.getFullYear(), mesMovil.getMonth(), index - offsetMesMovil + 1));
   const tituloMesMovil = tituloDelMes(mesMovil);
   const diasRadar = radarInicio ? Array.from({ length: 7 }, (_, indice) => new Date(radarInicio.getFullYear(), radarInicio.getMonth(), radarInicio.getDate() + indice)) : [];
-  const totalesPorDia = diasRadar.map((dia) => ({ fecha: fechaIso(dia), dia, cantidad: radarFilas.filter((fila) => fila.fecha === fechaIso(dia)).reduce((total, fila) => total + fila.cantidad, 0) }));
   const zonasRadar = Array.from(new Map(radarFilas.filter((fila) => fila.zona_id).map((fila) => [fila.zona_id!, fila.zona])).entries()).map(([id, nombre]) => {
     const zona = catalogos.zonas.find((item) => item.id === id);
     return { id, nombre, cantidad: radarFilas.filter((fila) => fila.zona_id === id).reduce((total, fila) => total + fila.cantidad, 0), latitud: zona?.latitud ?? null, longitud: zona?.longitud ?? null };

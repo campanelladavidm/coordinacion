@@ -106,7 +106,7 @@ export function ZoneActivityMap({ points, selectedZoneId, onSelectZone }: ZoneAc
             const tileCount = 2 ** zoom;
             if (row < 0 || row >= tileCount) return null;
             const style: CSSProperties = { left: column * tileSize - left, top: row * tileSize - top };
-            return <img key={`${zoom}-${column}-${row}`} className="radar-map-tile" src={tileUrl(zoom, column, row)} alt="" draggable={false} style={style} />;
+            return <div key={`${zoom}-${column}-${row}`} className="radar-map-tile" style={{ ...style, backgroundImage: `url("${tileUrl(zoom, column, row)}")` }} />;
           }))}
         </div>
         <div className="radar-map-heat" aria-hidden="true">

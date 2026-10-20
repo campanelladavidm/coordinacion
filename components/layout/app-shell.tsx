@@ -4,6 +4,7 @@ import { NavLinks } from "@/components/layout/nav-links";
 import { SessionControls } from "@/components/layout/session-controls";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { WorkspaceFrame } from "@/components/layout/workspace-frame";
+import { WikiBubble } from "@/components/wiki/wiki-bubble";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <WorkspaceFrame>{children}</WorkspaceFrame>
+      <WikiBubble />
     </div>
   );
 }
