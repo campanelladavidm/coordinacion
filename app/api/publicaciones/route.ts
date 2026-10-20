@@ -138,7 +138,7 @@ export async function DELETE(request: NextRequest) {
     const { data: current, error: readError } = await admin.from("notas_equipo").select("id,creado_por,imagen_url").eq("id", id).maybeSingle();
     if (readError) throw readError;
     if (!current) return NextResponse.json({ error: "No se encontró la publicación." }, { status: 404 });
-    if (!["SUPERVISOR", "JEFE"].includes(auth.rol)) return NextResponse.json({ error: "Solo un Jefe o Supervisor puede eliminar publicaciones." }, { status: 403 });
+    if (current.creado_por !== auth.userId && !["SUPERVISOR", "JEFE"].includes(auth.rol)) return NextResponse.json({ error: "Solo podés eliminar tus propias publicaciones." }, { status: 403 });
     const { error } = await admin.from("notas_equipo").delete().eq("id", id);
     if (error) throw error;
     const path = imagePath(current.imagen_url);
