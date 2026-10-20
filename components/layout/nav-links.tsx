@@ -63,6 +63,8 @@ export function NavLinks() {
     return true;
   });
 
+  if (pathname === "/login") return null;
+
   return (
     <>
     <button type="button" className="mobile-menu-toggle" aria-expanded={mobileOpen} aria-controls="primary-navigation" onClick={() => setOpenAtPath(mobileOpen ? null : pathname)}>

@@ -1,11 +1,12 @@
 ﻿"use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useCoordinacionesDemo, type ContextoUsuario } from "@/components/providers/demo-data-provider";
 import { createClient } from "@/lib/supabase/client";
 
 export function SessionControls() {
+  const pathname = usePathname();
   const router = useRouter();
   const { usuarioActual, error, rolAutenticado, usuarioEnContexto, seleccionarUsuarioContexto } = useCoordinacionesDemo();
   const [cerrando, setCerrando] = useState(false);
@@ -27,6 +28,8 @@ export function SessionControls() {
     }).catch(() => undefined);
     return () => { vigente = false; };
   }, [rolAutenticado]);
+
+  if (pathname === "/login") return null;
 
   async function cerrarSesion() {
     setCerrando(true);

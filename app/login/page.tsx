@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -32,7 +31,6 @@ export default function LoginPage() {
 
   return (
     <section>
-      <Link href="/login" className="back-link">Acceso interno</Link>
       <div className="panel auth-card">
         <PageHeading eyebrow="Acceso interno" title="Iniciar sesión" description="Ingresá con tu cuenta de Coordinaciones WN." />
         <form method="post" onSubmit={iniciarSesion}>
