@@ -45,9 +45,14 @@ export async function GET(request: NextRequest) {
     if (cerradosError) throw cerradosError;
     const ids = (asignaciones ?? []).map((row) => row.aviso_id);
     const cerradosIds = new Set((cerrados ?? []).map((row) => row.aviso_id));
-    const avisos = ids.length ? await admin.from("avisos").select("id,texto,desde,hasta").in("id", ids).lte("desde", hoy).gte("hasta", hoy).order("created_at", { ascending: false }) : { data: [], error: null };
+    const avisos = ids.length ? await admin.from("avisos").select("id,texto,desde,hasta,creado_por").in("id", ids).lte("desde", hoy).gte("hasta", hoy).order("created_at", { ascending: false }) : { data: [], error: null };
     if (avisos.error) throw avisos.error;
-    return NextResponse.json({ usuarios: (usuarios ?? []).map((u) => ({ id: u.id, nombre: u.nombre_completo || "Usuario" })), avisos: (avisos.data ?? []).filter((aviso) => !cerradosIds.has(aviso.id)) });
+    const vigentes = (avisos.data ?? []).filter((aviso) => !cerradosIds.has(aviso.id));
+    const creadoresIds = [...new Set(vigentes.map((aviso) => aviso.creado_por))];
+    const creadores = creadoresIds.length ? await admin.from("usuarios").select("id,nombre_completo").in("id", creadoresIds) : { data: [], error: null };
+    if (creadores.error) throw creadores.error;
+    const nombresCreadores = new Map((creadores.data ?? []).map((usuario) => [usuario.id, usuario.nombre_completo || "Usuario"]));
+    return NextResponse.json({ usuarios: (usuarios ?? []).map((u) => ({ id: u.id, nombre: u.nombre_completo || "Usuario" })), avisos: vigentes.map((aviso) => ({ ...aviso, creadorNombre: nombresCreadores.get(aviso.creado_por) ?? "Usuario" })) });
   } catch (error) { return errorServidor(error); }
 }
 

@@ -144,9 +144,10 @@ button { color: inherit; }
   .metric-value { font-size: 21px; }
   .catalog-grid { grid-template-columns: 1fr; }
 }
-.calendar-alert { position: fixed; z-index: 80; top: 86px; right: 28px; display: flex; width: min(350px, calc(100vw - 32px)); min-height: 100px; align-items: flex-start; gap: 12px; border: 1px solid #edcf64; border-radius: 7px 7px 18px 7px; background: #fff0a8; box-shadow: 0 10px 35px rgb(0 0 0 / 38%); padding: 31px 15px 16px 18px; color: #1b2634; transform: rotate(-1deg); }
+.calendar-alert { position: fixed; z-index: 80; top: 86px; right: 28px; display: flex; width: min(350px, calc(100vw - 32px)); min-height: 100px; align-items: flex-start; gap: 12px; border: 1px solid #edcf64; border-radius: 7px 7px 18px 7px; background: #fff0a8; box-shadow: 0 10px 35px rgb(0 0 0 / 38%); padding: 31px 15px 29px 18px; color: #1b2634; transform: rotate(-1deg); }
 .calendar-alert::after { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; border-top: 1px solid #d9bd53; border-left: 1px solid #d9bd53; border-radius: 0 0 14px; background: #f6dc78; content: ""; }
 .calendar-alert p { display: block; width: 100%; max-width: none; min-width: 0; flex: 0 0 100%; margin: 0; overflow-wrap: anywhere; font-family: Arial, "Segoe UI", sans-serif; font-size: 12px; font-weight: 400 !important; line-height: 1.4; text-align: justify; text-align-last: left; white-space: pre-wrap; }
+.calendar-alert-author { position: absolute; right: 28px; bottom: 7px; z-index: 1; max-width: calc(100% - 50px); overflow: hidden; color: #59616b; font-size: 9px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-alert-controls { position: absolute; top: 5px; right: 8px; display: flex; align-items: center; gap: 3px; }
 .calendar-alert-controls button { position: relative; z-index: 1; display: grid; width: 18px; height: 20px; place-items: center; border: 0; background: transparent; padding: 0; color: #59616b; font-size: 15px; font-weight: 500; line-height: 1; cursor: pointer; }
 .calendar-alert-controls button:hover { color: #1b2634; }
