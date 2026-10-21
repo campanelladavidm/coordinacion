@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider";
 
-type MenuIcon = "calendar" | "list" | "settings" | "users" | "chart" | "notes" | "liqui";
+type MenuIcon = "calendar" | "list" | "settings" | "users" | "chart" | "notes" | "liqui" | "tasks";
 
 const links: { href: string; label: string; icon: MenuIcon }[] = [
   { href: "/", label: "Calendario", icon: "calendar" },
@@ -13,6 +13,7 @@ const links: { href: string; label: string; icon: MenuIcon }[] = [
   { href: "/liqui", label: "Liqui", icon: "liqui" },
   { href: "/paneles", label: "Dash", icon: "chart" },
   { href: "/novedades", label: "Novedades", icon: "notes" },
+  { href: "/tareas", label: "Tareas", icon: "tasks" },
   { href: "/configuraciones", label: "Configuraciones", icon: "settings" },
   { href: "/usuarios", label: "Usuarios", icon: "users" },
 ];
@@ -34,6 +35,7 @@ function Icon({ name }: { name: MenuIcon }) {
   if (name === "chart") return <svg {...common}><path d="M4 19.5h16" /><rect x="5" y="11" width="3.5" height="6.5" rx=".8" /><rect x="10.25" y="7.5" width="3.5" height="10" rx=".8" /><rect x="15.5" y="4" width="3.5" height="13.5" rx=".8" /></svg>;
   if (name === "settings") return <svg {...common}><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z" /><path d="m19.3 13.5 1.1.9-1.5 2.6-1.4-.5a7.7 7.7 0 0 1-1.7 1l-.2 1.5h-3l-.3-1.5a7.7 7.7 0 0 1-1.7-1l-1.4.5-1.5-2.6 1.1-.9a6.8 6.8 0 0 1 0-2l-1.1-.9 1.5-2.6 1.4.5a7.7 7.7 0 0 1 1.7-1l.3-1.5h3l.2 1.5a7.7 7.7 0 0 1 1.7 1l1.4-.5 1.5 2.6-1.1.9a6.8 6.8 0 0 1 0 2Z" /></svg>;
   if (name === "liqui") return <svg {...common}><text x="12" y="19" textAnchor="middle" fontSize="21" fontWeight="700" fill="currentColor" stroke="none">$</text></svg>;
+  if (name === "tasks") return <svg {...common}><rect x="4" y="4" width="16" height="17" rx="2" /><path d="M9 4V2.8h6V4M8 9h8M8 13h8M8 17h5" /></svg>;
   return <svg {...common}><path d="M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM21 20v-1.5a4 4 0 0 0-3-3.9M16 3.2a4 4 0 0 1 0 7.6" /></svg>;
 }
 
