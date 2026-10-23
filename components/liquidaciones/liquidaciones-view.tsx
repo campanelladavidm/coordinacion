@@ -76,6 +76,9 @@ export function LiquidacionesView() {
   const [exportacion, setExportacion] = useState<Exportacion>(null);
   const [tercerizadaId, setTercerizadaId] = useState("");
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
+  const [conceptoArrastrado, setConceptoArrastrado] = useState<string | null>(null);
+  const [conceptoSobre, setConceptoSobre] = useState<string | null>(null);
+  const conceptoArrastradoRef = useRef<string | null>(null);
   const [informacionAdicional, setInformacionAdicional] = useState("");
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
@@ -214,6 +217,18 @@ export function LiquidacionesView() {
 
   function quitarConcepto(id: string) {
     setConceptos((actual) => actual.filter((item) => item.id !== id).map((item) => item.formula?.conceptoId === id ? { ...item, formula: undefined } : item));
+  }
+
+  function moverConceptoAntes(id: string, destinoId: string, despues: boolean) {
+    setConceptos((actual) => {
+      const origen = actual.find((item) => item.id === id);
+      if (!origen || id === destinoId) return actual;
+      const siguiente = actual.filter((item) => item.id !== id);
+      const indiceDestino = siguiente.findIndex((item) => item.id === destinoId);
+      if (indiceDestino < 0) return actual;
+      siguiente.splice(indiceDestino + (despues ? 1 : 0), 0, origen);
+      return siguiente;
+    });
   }
 
   async function guardar(actualConceptos = conceptos, destinoId = tercerizadaId, destinoMes = mes, destinoAnio = anio, actualInformacion = informacionAdicional) {
@@ -390,8 +405,8 @@ export function LiquidacionesView() {
             <section className="liqui-concepts panel">
               <div className="liqui-section-head"><div><h3>Conceptos</h3><span>{conceptos.length} conceptos</span>{mensaje && <small className="liqui-autosave-note">{mensaje}</small>}</div><button className="button" type="button" onClick={agregarConcepto} disabled={soloLectura}>+ Agregar concepto</button></div>
               {!conceptos.length && <div className="liqui-empty">Todavía no hay conceptos. Agregá uno para empezar la liquidación.</div>}
-              {conceptos.map((item) => <article className="liqui-concept-row" key={item.id}>
-                <div className="liqui-concept-main"><input className="liqui-concept-name" aria-label="Nombre del concepto" placeholder="Nombre del concepto" value={item.nombre} onChange={(event) => actualizarConcepto(item.id, "nombre", event.target.value)} disabled={soloLectura} />
+              {conceptos.map((item) => <article className={`liqui-concept-row${conceptoArrastrado === item.id ? " is-dragging" : ""}${conceptoSobre === item.id && conceptoArrastrado !== item.id ? " is-drop-target" : ""}`} key={item.id} onDragOver={(event) => { const origen = conceptoArrastradoRef.current; if (!origen || origen === item.id) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; if (conceptoSobre !== item.id) setConceptoSobre(item.id); }} onDrop={(event) => { event.preventDefault(); const origen = conceptoArrastradoRef.current || event.dataTransfer.getData("text/plain"); const rect = event.currentTarget.getBoundingClientRect(); if (origen) moverConceptoAntes(origen, item.id, event.clientY >= rect.top + rect.height / 2); conceptoArrastradoRef.current = null; setConceptoArrastrado(null); setConceptoSobre(null); }}>
+                <div className="liqui-concept-main"><div className="liqui-concept-title"><span className="liqui-drag-handle" draggable={!soloLectura} title="Arrastrá para cambiar el orden" aria-hidden="true" onDragStart={(event) => { event.stopPropagation(); conceptoArrastradoRef.current = item.id; setConceptoArrastrado(item.id); setConceptoSobre(null); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); }} onDragEnd={() => { conceptoArrastradoRef.current = null; setConceptoArrastrado(null); setConceptoSobre(null); }}>⠿</span><input className="liqui-concept-name" aria-label="Nombre del concepto" placeholder="Nombre del concepto" value={item.nombre} onChange={(event) => actualizarConcepto(item.id, "nombre", event.target.value)} disabled={soloLectura} /></div>
                   <div className="liqui-concept-meta"><select aria-label="El concepto suma o resta" value={item.tipo} onChange={(event) => actualizarConcepto(item.id, "tipo", event.target.value)} disabled={soloLectura}><option value="SUMA">Suma</option><option value="RESTA">Resta</option></select><textarea aria-label="Nota rápida" title={item.nota || undefined} placeholder="Nota rápida (opcional)" value={item.nota} onChange={(event) => actualizarConcepto(item.id, "nota", event.target.value)} disabled={soloLectura} rows={1} /></div>
                 </div>
                 <label className="liqui-concept-field liqui-quantity"><span>Cantidad</span><input type="number" min="0" step="any" value={item.cantidad || ""} onChange={(event) => actualizarConcepto(item.id, "cantidad", event.target.value)} disabled={soloLectura} /></label>

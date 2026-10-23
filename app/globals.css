@@ -1267,6 +1267,11 @@ html[data-theme="light"] .wiki-danger { color: #a93445; }
 
 /* Mejoras de captura automática en Liquidaciones */
 .liqui-concept-row { margin: 8px 9px; border: 1px solid #34516e; border-bottom: 3px solid #496783; border-left: 4px solid #5688b5; border-radius: 8px; background: #102137; padding: 13px 12px; box-shadow: 0 2px 8px rgb(0 0 0 / 14%); }
+.liqui-concept-row { position: relative; }
+.liqui-concept-row.is-dragging { opacity: .5; }
+.liqui-concept-row.is-drop-target { border-top-color: #65b5f5; box-shadow: 0 -3px 0 rgb(101 181 245 / 70%), 0 2px 8px rgb(0 0 0 / 14%); }
+.liqui-drag-handle { display: flex; width: 16px; height: 20px; flex: 0 0 16px; align-items: center; justify-content: center; color: #7892aa; font-size: 15px; line-height: 1; cursor: grab; user-select: none; }
+.liqui-drag-handle:active { cursor: grabbing; }
 .liqui-concept-row:nth-of-type(even) { background: #0e1d2d; }
 .liqui-concept-row input[type="number"], .liqui-tool-card input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
 .liqui-concept-row input[type="number"]::-webkit-inner-spin-button, .liqui-concept-row input[type="number"]::-webkit-outer-spin-button,
@@ -1517,9 +1522,10 @@ html[data-theme="light"] .liqui-concept-row:nth-of-type(even) { background: #edf
 html[data-theme="light"] .liqui-autosave-note { color: #18764d; }
 html[data-theme="light"] .liqui-linked-history-row b { color: #286fa8; }
 .liqui-concept-row { grid-template-rows: 20px 32px; align-items: stretch; row-gap: 4px; }
-.liqui-concept-main { display: contents; }
-.liqui-concept-row .liqui-concept-name { grid-column: 1; grid-row: 1; height: 20px; min-height: 20px; padding-top: 0; padding-bottom: 0; line-height: 20px; }
-.liqui-concept-meta { grid-column: 1; grid-row: 1 / span 2; align-self: end; height: 32px; }
+.liqui-concept-main { display: grid; grid-column: 1; grid-row: 1 / span 2; grid-template-rows: 20px 32px; align-self: stretch; gap: 4px; }
+.liqui-concept-title { display: flex; min-width: 0; align-items: center; gap: 3px; }
+.liqui-concept-row .liqui-concept-name { min-width: 0; flex: 1; height: 20px; min-height: 20px; padding-top: 0; padding-bottom: 0; line-height: 20px; }
+.liqui-concept-meta { grid-column: 1; grid-row: 2; align-self: stretch; height: 32px; }
 .liqui-concept-meta select, .liqui-concept-meta input, .liqui-concept-meta textarea { height: 32px; }
 .liqui-concept-meta textarea { min-height: 32px; max-height: 32px; padding-top: 8px; padding-bottom: 8px; }
 .liqui-concept-field { grid-row: 1 / span 2; grid-template-rows: 20px 32px; align-self: stretch; gap: 4px; }
@@ -1531,14 +1537,14 @@ html[data-theme="light"] .liqui-linked-history-row b { color: #286fa8; }
 .liqui-delete { grid-column: 6; grid-row: 1 / span 2; align-self: center; }
 @media (max-width: 560px) {
   .liqui-concept-row { grid-template-columns: 1fr 1fr; grid-template-rows: auto; align-items: end; }
-  .liqui-concept-row .liqui-concept-name { grid-column: 1 / -1; grid-row: auto; height: 24px; min-height: 24px; line-height: 24px; }
-  .liqui-concept-meta { grid-column: 1 / -1; grid-row: auto; }
+  .liqui-concept-main { grid-column: 1 / -1; grid-row: auto; grid-template-rows: 24px 32px; }
+  .liqui-concept-row .liqui-concept-name { grid-column: auto; grid-row: auto; height: 24px; min-height: 24px; line-height: 24px; }
+  .liqui-concept-meta { grid-column: auto; grid-row: 2; }
   .liqui-concept-field { grid-row: auto; grid-template-rows: 18px 32px; }
   .liqui-quantity { grid-column: 1; }
   .liqui-price { grid-column: 2; }
   .liqui-link { grid-column: 1 / -1; }
   .liqui-line-total { grid-column: 1; grid-row: auto; align-self: center; }
-  .liqui-delete { grid-column: 2; grid-row: auto; }
 }
 @media print {
   @page { size: A4; margin: 0; }
