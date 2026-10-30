@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.75.66"],
   experimental: {
     agentFeedback: true,
+    agentUpgrade: "security",
   },
   cacheComponents: true,
   partialPrefetching: true,
