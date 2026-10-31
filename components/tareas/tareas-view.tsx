@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Estado = "PENDIENTE" | "EN_CURSO" | "FINALIZADA" | "MATERIALES";
 type Prioridad = "BAJA" | "MEDIA" | "ALTA";
@@ -70,6 +71,9 @@ function SelectorAsignados({ usuarios, seleccionados, cambiar }: { usuarios: Usu
 }
 
 export function TareasView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const abrirTareaId = searchParams.get("abrir");
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [usuarioId, setUsuarioId] = useState("");
@@ -91,10 +95,11 @@ export function TareasView() {
   const [archivoSubiendo, setArchivoSubiendo] = useState(false);
   const [arrastrada, setArrastrada] = useState<string | null>(null);
 
-  const cargar = useCallback(async (silencioso = false) => {
+  const cargar = useCallback(async (silencioso = false, tareaSolicitada?: string) => {
     if (!silencioso) setCargando(true);
     try {
-      const response = await fetch("/api/tareas", { headers: requestHeaders(), cache: "no-store" });
+      const url = tareaSolicitada ? `/api/tareas?taskId=${encodeURIComponent(tareaSolicitada)}` : "/api/tareas";
+      const response = await fetch(url, { headers: requestHeaders(), cache: "no-store" });
       const data = await response.json() as { tareas?: Tarea[]; usuarios?: Usuario[]; usuarioId?: string; rol?: string; error?: string };
       if (!response.ok) throw new Error(data.error || "No se pudo cargar el tablero.");
       setTareas(data.tareas ?? []);
@@ -111,9 +116,18 @@ export function TareasView() {
   }, []);
 
   useEffect(() => {
-    const initialLoad = window.setTimeout(() => { void cargar(); }, 0);
+    const initialLoad = window.setTimeout(() => { void cargar(false, abrirTareaId ?? undefined); }, 0);
     return () => window.clearTimeout(initialLoad);
-  }, [cargar]);
+  }, [cargar, abrirTareaId]);
+  useEffect(() => {
+    if (!abrirTareaId || cargando) return;
+    const tarea = tareas.find((item) => item.id === abrirTareaId);
+    if (!tarea) return;
+    setSeleccionada(tarea);
+    setEditar(false);
+    setError("");
+    router.replace("/tareas", { scroll: false });
+  }, [abrirTareaId, cargando, router, tareas]);
   useEffect(() => {
     if (!modalCrear && !seleccionada) return;
     function cerrarConEscape(event: KeyboardEvent) {

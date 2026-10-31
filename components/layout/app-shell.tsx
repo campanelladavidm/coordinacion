@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { NavLinks } from "@/components/layout/nav-links";
 import { SessionControls } from "@/components/layout/session-controls";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { TaskNotifications } from "@/components/layout/task-notifications";
 import { WorkspaceFrame } from "@/components/layout/workspace-frame";
 import { WikiBubble } from "@/components/wiki/wiki-bubble";
 
@@ -18,6 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Suspense>
         <div className="topbar-tools">
           <ThemeToggle />
+          <TaskNotifications />
           <SessionControls />
         </div>
       </header>

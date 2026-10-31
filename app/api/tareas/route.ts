@@ -18,8 +18,16 @@ export async function GET(request: NextRequest) {
   if ("response" in auth) return auth.response;
   try {
     const admin = createAdminClient();
-    const { data: rows, error } = await admin.from("tareas").select("id,titulo,descripcion,estado,prioridad,creado_por,fecha_limite,resuelta_at,created_at,updated_at").order("updated_at", { ascending: false }).limit(300);
+    const taskColumns = "id,titulo,descripcion,estado,prioridad,creado_por,fecha_limite,resuelta_at,created_at,updated_at";
+    const { data: recentRows, error } = await admin.from("tareas").select(taskColumns).order("updated_at", { ascending: false }).limit(300);
     if (error) throw error;
+    let rows = recentRows ?? [];
+    const requestedTaskId = request.nextUrl.searchParams.get("taskId");
+    if (esUuid(requestedTaskId) && !rows.some((row) => row.id === requestedTaskId)) {
+      const { data: requestedTask, error: requestedTaskError } = await admin.from("tareas").select(taskColumns).eq("id", requestedTaskId).maybeSingle();
+      if (requestedTaskError) throw requestedTaskError;
+      if (requestedTask) rows = [...rows, requestedTask];
+    }
     const ids = (rows ?? []).map((row) => row.id);
     const [checklistResult, commentsResult, usersResult, assignmentsResult, filesResult] = await Promise.all([
       ids.length ? admin.from("tareas_checklist").select("id,tarea_id,texto,completado,creado_por,created_at").in("tarea_id", ids).order("created_at") : Promise.resolve({ data: [], error: null }),
@@ -161,13 +169,13 @@ export async function PATCH(request: NextRequest) {
     }
     const id = body.id;
     if (!esUuid(id)) return NextResponse.json({ error: "La tarea no es válida." }, { status: 400 });
-    const { data: current, error: readError } = await admin.from("tareas").select("id,creado_por").eq("id", id).maybeSingle();
+    const { data: current, error: readError } = await admin.from("tareas").select("id,creado_por,estado").eq("id", id).maybeSingle();
     if (readError) throw readError;
     if (!current) return NextResponse.json({ error: "No se encontró la tarea." }, { status: 404 });
     if (body.tipo === "estado") {
       if (typeof body.estado !== "string" || !(ESTADOS as readonly string[]).includes(body.estado)) return NextResponse.json({ error: "Elegí una columna válida." }, { status: 400 });
       const estado = body.estado as EstadoTarea;
-      const { error } = await admin.from("tareas").update({ estado, resuelta_at: estado === "FINALIZADA" ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq("id", id);
+      const { error } = await admin.from("tareas").update({ estado, actualizado_por: auth.actor.id, resuelta_at: estado === "FINALIZADA" ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
@@ -185,12 +193,20 @@ export async function PATCH(request: NextRequest) {
       if (error) throw error;
       if ((users?.length ?? 0) !== asignadosA.length) return NextResponse.json({ error: "La lista incluye usuarios inactivos o inválidos." }, { status: 400 });
     }
-    const { error } = await admin.from("tareas").update({ titulo, descripcion, prioridad: prioridad as PrioridadTarea, fecha_limite: fechaLimite, updated_at: new Date().toISOString() }).eq("id", id);
+    const { error } = await admin.from("tareas").update({ titulo, descripcion, prioridad: prioridad as PrioridadTarea, fecha_limite: fechaLimite, actualizado_por: auth.actor.id, updated_at: new Date().toISOString() }).eq("id", id);
     if (error) throw error;
-    const { error: deleteAssignmentsError } = await admin.from("tareas_asignados").delete().eq("tarea_id", id);
-    if (deleteAssignmentsError) throw deleteAssignmentsError;
-    if (asignadosA.length) {
-      const { error: assignmentError } = await admin.from("tareas_asignados").insert(asignadosA.map((usuario_id) => ({ tarea_id: id, usuario_id: usuario_id as string, asignado_por: auth.actor.id })));
+    const { data: currentAssignments, error: currentAssignmentsError } = await admin.from("tareas_asignados").select("usuario_id").eq("tarea_id", id);
+    if (currentAssignmentsError) throw currentAssignmentsError;
+    const currentAssigneeIds = new Set((currentAssignments ?? []).map((assignment) => assignment.usuario_id));
+    const nextAssigneeIds = new Set(asignadosA as string[]);
+    const removedAssigneeIds = [...currentAssigneeIds].filter((usuarioId) => !nextAssigneeIds.has(usuarioId));
+    const addedAssigneeIds = [...nextAssigneeIds].filter((usuarioId) => !currentAssigneeIds.has(usuarioId));
+    if (removedAssigneeIds.length) {
+      const { error: deleteAssignmentsError } = await admin.from("tareas_asignados").delete().eq("tarea_id", id).in("usuario_id", removedAssigneeIds);
+      if (deleteAssignmentsError) throw deleteAssignmentsError;
+    }
+    if (addedAssigneeIds.length) {
+      const { error: assignmentError } = await admin.from("tareas_asignados").insert(addedAssigneeIds.map((usuario_id) => ({ tarea_id: id, usuario_id, asignado_por: auth.actor.id })));
       if (assignmentError) throw assignmentError;
     }
     return NextResponse.json({ ok: true });

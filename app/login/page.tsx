@@ -1,12 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { PageHeading } from "@/components/ui/page-heading";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
 
@@ -15,18 +12,34 @@ export default function LoginPage() {
     setCargando(true);
     setError("");
     const formulario = new FormData(event.currentTarget);
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: String(formulario.get("email")).trim(),
-      password: String(formulario.get("password")),
-    });
-    setCargando(false);
-    if (authError) {
-      setError("No pudimos iniciar sesión. Revisá el correo y la contraseña.");
-      return;
+    try {
+      const respuesta = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: String(formulario.get("email")).trim(),
+          password: String(formulario.get("password")),
+        }),
+      });
+      const resultado = await respuesta.json() as { error?: string };
+      if (!respuesta.ok) {
+        const mensaje = resultado.error ?? "No se pudo iniciar sesión.";
+        const detalle = mensaje.toLowerCase();
+        if (detalle.includes("invalid login credentials")) {
+          setError("El correo o la contraseña no coinciden. Revisalos e intentá nuevamente.");
+        } else if (detalle.includes("email not confirmed")) {
+          setError("La cuenta todavía no confirmó su correo electrónico.");
+        } else {
+          setError(`No se pudo iniciar sesión: ${mensaje}`);
+        }
+        return;
+      }
+      window.location.assign("/");
+    } catch {
+      setError("No se pudo conectar con el servicio de acceso. Revisá tu conexión e intentá nuevamente.");
+    } finally {
+      setCargando(false);
     }
-    router.replace("/");
-    router.refresh();
   }
 
   return (

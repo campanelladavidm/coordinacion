@@ -424,6 +424,47 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
     <button className="button bulk-assignment-copy" type="button" disabled={guardandoAsignacion} onClick={() => void copiarTicketsSeleccionados()}>{seleccionCopiada ? "¡Copiados!" : "Copiar seleccionados"}</button>
   </div> : null;
 
+  const renderListaCoordinaciones = (items: Coordinacion[]) => <div className="coordination-list">
+    {items.map((coordinacion) => (
+      <article key={coordinacion.id} data-coordinacion-id={coordinacion.id} className={`coordination-item${idArrastrado === coordinacion.id ? " is-dragging" : ""}`} onDragStart={(event) => iniciarArrastre(event, coordinacion.id)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = guardandoOrden ? "none" : "move"; }} onDragEnd={() => setIdArrastrado(null)}>
+        <button className="custody-delete-button coordination-delete-button" type="button" disabled={eliminandoCoordinacion === coordinacion.id} title="Eliminar coordinación" aria-label={`Eliminar coordinación ${coordinacion.ticket}`} onClick={() => void eliminarCaso(coordinacion)}>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3.5h6M4.5 5.5h11m-9.5 0 .65 11h6.7l.65-11M8 8.5v5m4-5v5" /></svg>
+        </button>
+        <div role={coordinacion.cuadrillaId === null ? "group" : "button"} tabIndex={0} className={`coordination-summary${coordinacion.cuadrillaId === null ? " coordination-summary-selectable" : ""}${casosSeleccionados.some((caso) => caso.id === coordinacion.id) ? " coordination-summary-selected" : ""}`} aria-label={coordinacion.cuadrillaId === null ? `Coordinación ${coordinacion.ticket}; seleccioná la casilla para asignar a una cuadrilla` : undefined} aria-expanded={coordinacion.cuadrillaId === null ? undefined : abierta === coordinacion.id} onKeyDown={(event) => {
+          if ((event.target as HTMLElement).closest("input[type='checkbox']")) return;
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          setAbierta(abierta === coordinacion.id ? null : coordinacion.id);
+        }} onClick={(event) => {
+          const target = event.target as HTMLElement;
+          if (target.closest("input[type='checkbox']")) return;
+          if (target.closest(".coordination-ticket") && window.getSelection()?.toString()) return;
+          setAbierta(abierta === coordinacion.id ? null : coordinacion.id);
+        }} onDoubleClick={(event) => {
+          if (!(event.target as HTMLElement).closest(".state-badge")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setErrorEstado("");
+          if (coordinacion.estadoId !== idConfirmado) {
+            if (!idConfirmado) {
+              setErrorEstado("No se encontró el estado Confirmado en Configuraciones.");
+              return;
+            }
+            void actualizarCoordinacion(coordinacion.id, { ...coordinacion, estadoId: idConfirmado }).catch((cause) => {
+              setErrorEstado(cause instanceof Error ? `No se pudo confirmar: ${cause.message}` : "No se pudo confirmar la coordinación.");
+            });
+          }
+        }}>
+          <span className="coordination-ticket-cell"><span className="coordination-drag-handle" draggable={!termino && !guardandoOrden} title="Arrastrá para reordenar" aria-label="Arrastrar para reordenar">⠿</span><span className="coordination-ticket" title="Seleccioná el número para copiarlo">{coordinacion.ticket}</span>{coordinacion.cuadrillaId === null && <input className="coordination-select-checkbox" type="checkbox" checked={casosSeleccionados.some((caso) => caso.id === coordinacion.id)} disabled={guardandoAsignacion} aria-label={`Seleccionar caso ${coordinacion.ticket} para asignarlo a una cuadrilla`} onClick={(event) => event.stopPropagation()} onChange={(event) => cambiarSeleccionMasiva(coordinacion.id, event.target.checked)} />}</span>
+          <span className="coordination-meta"><span>{nombreDe(catalogos.tecnologias, coordinacion.tecnologiaId)}</span><span>{coordinacion.zona ? nombreDe(catalogos.zonas, coordinacion.zona) : "Zona sin asignar"}</span><span>{nombreDe(catalogos.categorias, coordinacion.categoriaId)}</span></span>
+          <span className={"state-badge state-" + normalizarBusqueda(nombreDe(catalogos.estados, coordinacion.estadoId)).replace(/\s+/g, "-")} title="Doble clic para marcar como confirmado">{nombreDe(catalogos.estados, coordinacion.estadoId)}</span>
+          <span className="expand-chevron">{abierta === coordinacion.id ? "⌃" : "⌄"}</span>
+        </div>
+        {abierta === coordinacion.id && <DetalleCoordinacion coordinacion={coordinacion} onEditar={() => setCoordinacionEditandoModal(coordinacion.id)} />}
+      </article>
+    ))}
+  </div>;
+
   return (
     <section>
       <Link href="/" className="back-link">← Volver al calendario</Link>
@@ -462,6 +503,19 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
               <h3 className="company-heading">{nombreTercerizada(tercerizadaId === "sin-tercerizada" ? null : tercerizadaId)}<span>{[...cuadrillasDeTercerizada.values()].reduce((suma, items) => suma + items.length, 0)}</span></h3>
               {[...cuadrillasDeTercerizada.entries()].map(([cuadrillaId, items]) => {
                 const itemsOrdenados = [...items].sort((a, b) => a.orden - b.orden);
+                const itemsPorZona = new Map<string, Coordinacion[]>();
+                if (cuadrillaId === "sin-cuadrilla") {
+                  for (const item of itemsOrdenados) {
+                    const zonaId = item.zona ?? "sin-zona";
+                    if (!itemsPorZona.has(zonaId)) itemsPorZona.set(zonaId, []);
+                    itemsPorZona.get(zonaId)!.push(item);
+                  }
+                }
+                const zonasSinCuadrilla = [...itemsPorZona.entries()].sort(([zonaA], [zonaB]) => {
+                  if (zonaA === "sin-zona") return 1;
+                  if (zonaB === "sin-zona") return -1;
+                  return nombreDe(catalogos.zonas, zonaA).localeCompare(nombreDe(catalogos.zonas, zonaB), "es");
+                });
                 const cuadrillaRealId = cuadrillaId === "sin-cuadrilla" ? null : cuadrillaId;
                 const casosCoordinados = delDia.filter((item) => item.cuadrillaId === cuadrillaRealId && (item.tercerizadaId ?? "sin-tercerizada") === tercerizadaId).length;
                 const rango = rangos.find((item) => item.fecha === fecha && item.cuadrillaId === cuadrillaId);
@@ -495,46 +549,12 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
                     </span>
                   </h4>
                   {casosSeleccionados.length > 0 && cuadrillaId === "sin-cuadrilla" && tercerizadaId === tercerizadaDelPrimerGrupoSinCuadrilla && barraAsignacionMasiva}
-                  <div className="coordination-list">
-                    {itemsOrdenados.map((coordinacion) => (
-                      <article key={coordinacion.id} data-coordinacion-id={coordinacion.id} className={`coordination-item${idArrastrado === coordinacion.id ? " is-dragging" : ""}`} onDragStart={(event) => iniciarArrastre(event, coordinacion.id)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = guardandoOrden ? "none" : "move"; }} onDragEnd={() => setIdArrastrado(null)}>
-                        <button className="custody-delete-button coordination-delete-button" type="button" disabled={eliminandoCoordinacion === coordinacion.id} title="Eliminar coordinación" aria-label={`Eliminar coordinación ${coordinacion.ticket}`} onClick={() => void eliminarCaso(coordinacion)}>
-                          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3.5h6M4.5 5.5h11m-9.5 0 .65 11h6.7l.65-11M8 8.5v5m4-5v5" /></svg>
-                        </button>
-                        <div role={coordinacion.cuadrillaId === null ? "group" : "button"} tabIndex={0} className={`coordination-summary${coordinacion.cuadrillaId === null ? " coordination-summary-selectable" : ""}${casosSeleccionados.some((caso) => caso.id === coordinacion.id) ? " coordination-summary-selected" : ""}`} aria-label={coordinacion.cuadrillaId === null ? `Coordinación ${coordinacion.ticket}; seleccioná la casilla para asignar a una cuadrilla` : undefined} aria-expanded={coordinacion.cuadrillaId === null ? undefined : abierta === coordinacion.id} onKeyDown={(event) => {
-                          if ((event.target as HTMLElement).closest("input[type='checkbox']")) return;
-                          if (event.key !== "Enter" && event.key !== " ") return;
-                          event.preventDefault();
-                          setAbierta(abierta === coordinacion.id ? null : coordinacion.id);
-                        }} onClick={(event) => {
-                          const target = event.target as HTMLElement;
-                          if (target.closest("input[type='checkbox']")) return;
-                          if (target.closest(".coordination-ticket") && window.getSelection()?.toString()) return;
-                          setAbierta(abierta === coordinacion.id ? null : coordinacion.id);
-                        }} onDoubleClick={(event) => {
-                          if (!(event.target as HTMLElement).closest(".state-badge")) return;
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setErrorEstado("");
-                          if (coordinacion.estadoId !== idConfirmado) {
-                            if (!idConfirmado) {
-                              setErrorEstado("No se encontro el estado Confirmado en Configuraciones.");
-                              return;
-                            }
-                            void actualizarCoordinacion(coordinacion.id, { ...coordinacion, estadoId: idConfirmado }).catch((cause) => {
-                              setErrorEstado(cause instanceof Error ? `No se pudo confirmar: ${cause.message}` : "No se pudo confirmar la coordinacion.");
-                            });
-                          }
-                        }}>
-                          <span className="coordination-ticket-cell"><span className="coordination-drag-handle" draggable={!termino && !guardandoOrden} title="Arrastrá para reordenar" aria-label="Arrastrar para reordenar">⠿</span><span className="coordination-ticket" title="Seleccioná el número para copiarlo">{coordinacion.ticket}</span>{coordinacion.cuadrillaId === null && <input className="coordination-select-checkbox" type="checkbox" checked={casosSeleccionados.some((caso) => caso.id === coordinacion.id)} disabled={guardandoAsignacion} aria-label={`Seleccionar caso ${coordinacion.ticket} para asignarlo a una cuadrilla`} onClick={(event) => event.stopPropagation()} onChange={(event) => cambiarSeleccionMasiva(coordinacion.id, event.target.checked)} />}</span>
-                          <span className="coordination-meta"><span>{nombreDe(catalogos.tecnologias, coordinacion.tecnologiaId)}</span><span>{coordinacion.zona ? nombreDe(catalogos.zonas, coordinacion.zona) : "Zona sin asignar"}</span><span>{nombreDe(catalogos.categorias, coordinacion.categoriaId)}</span></span>
-                          <span className={"state-badge state-" + normalizarBusqueda(nombreDe(catalogos.estados, coordinacion.estadoId)).replace(/\s+/g, "-")} title="Doble clic para marcar como confirmado">{nombreDe(catalogos.estados, coordinacion.estadoId)}</span>
-                          <span className="expand-chevron">{abierta === coordinacion.id ? "⌃" : "⌄"}</span>
-                        </div>
-                        {abierta === coordinacion.id && <DetalleCoordinacion coordinacion={coordinacion} onEditar={() => setCoordinacionEditandoModal(coordinacion.id)} />}
-                      </article>
-                    ))}
-                  </div>
+                  {cuadrillaId === "sin-cuadrilla" ? <div className="unassigned-zone-groups">
+                    {zonasSinCuadrilla.map(([zonaId, itemsZona]) => <section key={zonaId} className="unassigned-zone-group">
+                      <h5 className="unassigned-zone-heading"><span>{zonaId === "sin-zona" ? "Zona sin asignar" : nombreDe(catalogos.zonas, zonaId)}</span><span>{itemsZona.length}</span></h5>
+                      {renderListaCoordinaciones(itemsZona)}
+                    </section>)}
+                  </div> : renderListaCoordinaciones(itemsOrdenados)}
                 </div>
               })}
             </section>
