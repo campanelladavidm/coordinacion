@@ -69,7 +69,7 @@ function validarConceptos(value: unknown): { conceptos: Concepto[] | null; error
       if (typeof parsed.conceptoId !== "string") return { conceptos: null, error: `La formula del concepto ${numeroConcepto} no tiene un concepto base valido.` };
       if (parsed.modo === "FIJO" || parsed.modo === "PORCENTAJE") {
         const valor = Number(parsed.valor);
-        if (!Number.isFinite(valor) || valor < 0) return { conceptos: null, error: `El adicional de la formula del concepto ${numeroConcepto} no es valido.` };
+        if (!Number.isFinite(valor) || (parsed.modo === "FIJO" && valor < 0) || (parsed.modo === "PORCENTAJE" && valor < -100)) return { conceptos: null, error: `El adicional de la formula del concepto ${numeroConcepto} no es valido.` };
         formula = { conceptoId: parsed.conceptoId, modo: parsed.modo, valor };
       } else {
         const adicional = Number(parsed.adicional);
