@@ -5,6 +5,7 @@ import { SessionControls } from "@/components/layout/session-controls";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { TaskNotifications } from "@/components/layout/task-notifications";
 import { WorkspaceFrame } from "@/components/layout/workspace-frame";
+import { CalculatorBubble } from "@/components/liquidaciones/calculator-bubble";
 import { WikiBubble } from "@/components/wiki/wiki-bubble";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -24,6 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <WorkspaceFrame>{children}</WorkspaceFrame>
+      <CalculatorBubble />
       <WikiBubble />
     </div>
   );

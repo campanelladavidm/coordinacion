@@ -134,9 +134,6 @@ export function LiquidacionesView() {
   const suma = conceptos.reduce((total, item) => total + (item.tipo === "SUMA" ? item.cantidad * item.precio : 0), 0);
   const resta = conceptos.reduce((total, item) => total + (item.tipo === "RESTA" ? item.cantidad * item.precio : 0), 0);
   const total = suma - resta;
-  const mesSiguiente = mes % 12 + 1;
-  const nombreMesSiguiente = nombresMeses[mesSiguiente - 1];
-  const anioSiguiente = anio + (mes === 12 ? 1 : 0);
   const anios = Array.from({ length: 7 }, (_, index) => anio - 3 + index);
   const soloLectura = estadoActual === "FINALIZADA" && !puedeReabrir;
 
@@ -301,44 +298,24 @@ export function LiquidacionesView() {
     setError("");
   }
 
-  async function crearProxima() {
-    if (!tercerizadaId) return;
-    setOcupado(true); setError(""); setMensaje("");
-    try {
-      if (!(await guardar(conceptos))) throw new Error("No se pudieron guardar los cambios antes de crear la próxima liquidación.");
-      await api("/api/liquidaciones", { method: "POST", body: JSON.stringify({ operacion: "crear_proxima", tercerizadaId, mes, anio }) }, contextoId);
-      setMes(mesSiguiente); setAnio(anioSiguiente);
-      setMensaje(`Se creó ${nombreMesSiguiente} ${anioSiguiente} con los conceptos y precios actuales. El período actual sigue como borrador.`);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo crear la próxima liquidación."); }
-    finally { setOcupado(false); }
-  }
-
-  async function finalizarPeriodo() {
-    if (!window.confirm(`¿Finalizar todas las liquidaciones de ${nombresMeses[mes - 1]} ${anio}? Quedarán bloqueadas para Coordinadores.`)) return;
-    setOcupado(true); setError(""); setMensaje("");
-    try {
-      if (tercerizadaId && !soloLectura && !(await guardar(conceptos))) throw new Error("No se pudieron guardar los cambios antes de finalizar el período.");
-      await api("/api/liquidaciones", { method: "POST", body: JSON.stringify({ operacion: "finalizar_periodo", mes, anio }) }, contextoId);
-      setMensaje(`Se finalizaron las liquidaciones y se prepararon los borradores de ${nombreMesSiguiente} ${anioSiguiente} con los conceptos y precios copiados.`); await cargar();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo finalizar el período."); }
-    finally { setOcupado(false); }
-  }
-
   const csvArchivos = useMemo(() => tercerizadas.map((empresa) => {
     const liquidacion = liquidaciones.find((item) => item.tercerizada_id === empresa.id);
     const conceptosEmpresa = empresa.id === tercerizadaId ? conceptos : liquidacion?.conceptos ?? [];
     const estadoEmpresa = empresa.id === tercerizadaId ? estadoActual : liquidacion?.estado ?? "BORRADOR";
+    const informacionEmpresa = empresa.id === tercerizadaId ? informacionAdicional : liquidacion?.informacion_adicional ?? "";
     const rows = [["Tercerizada", "Mes", "Año", "Estado", "Concepto", "Tipo", "Cantidad", "Precio unitario", "Subtotal", "Nota rápida", "Enlace"]];
     for (const item of conceptosEmpresa) rows.push([empresa.nombre, nombresMeses[mes - 1], String(anio), estadoEmpresa, item.nombre, item.tipo, String(item.cantidad), String(item.precio), String(item.cantidad * item.precio * (item.tipo === "RESTA" ? -1 : 1)), item.nota, item.enlace]);
     if (!conceptosEmpresa.length) rows.push([empresa.nombre, nombresMeses[mes - 1], String(anio), estadoEmpresa, "", "", "0", "0", "0", "", ""]);
+    rows.push(Array(11).fill(""));
+    rows.push(["Información adicional", informacionEmpresa, "", "", "", "", "", "", "", "", ""]);
     const csv = "\uFEFF" + rows.map((row) => row.map(csvValue).join(";")).join("\r\n");
     return { nombre: `${empresa.nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9_-]+/g, "_")}_${anio}_${String(mes).padStart(2, "0")}.csv`, contenido: new TextEncoder().encode(csv) };
-  }), [tercerizadas, liquidaciones, mes, anio, conceptos, tercerizadaId, estadoActual]);
+  }), [tercerizadas, liquidaciones, mes, anio, conceptos, informacionAdicional, tercerizadaId, estadoActual]);
 
   async function exportarZip() {
     setOcupado(true); setError(""); setMensaje("");
     try {
-      if (!soloLectura && conceptos.length) {
+      if (!soloLectura && tercerizadaId) {
         if (!(await guardar(conceptos))) throw new Error("No se pudieron guardar los cambios antes de exportar.");
       }
       const archivos = csvArchivos.map((file) => ({ nombre: file.nombre, contenido: file.contenido }));
@@ -424,10 +401,6 @@ export function LiquidacionesView() {
             </section>
           </>}
           <div className="liqui-feedback" aria-live="polite">{error && <p className="liqui-error">{error}</p>}{mensaje && !mensaje.startsWith("Guardado automáticamente") && !mensaje.startsWith("Guardando automáticamente") && <p className="liqui-success">{mensaje}</p>}</div>
-          <div className="liqui-main-actions">
-            <section className="panel liqui-tool-card"><h3>Próxima liquidación</h3><p>Copia los conceptos y precios a {nombreMesSiguiente}. El borrador actual sigue abierto.</p><button className="button liqui-action" type="button" onClick={() => void crearProxima()} disabled={ocupado || !tercerizadaId || estadoActual !== "BORRADOR"}>Crear próxima liquidación · {nombreMesSiguiente}</button></section>
-            <section className="panel liqui-tool-card liqui-close-card"><h3>Finalizar período</h3><p>Finaliza y bloquea las liquidaciones de todas las tercerizadas del mes.</p><button className="button button-primary liqui-action" type="button" onClick={() => void finalizarPeriodo()} disabled={ocupado || !tercerizadas.length}>Finalizar liquidación completa</button></section>
-          </div>
         </main>
 
         <aside className="liqui-tools">

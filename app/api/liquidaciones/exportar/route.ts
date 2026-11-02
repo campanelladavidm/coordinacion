@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requestOriginIsAllowed } from "@/lib/security/request-origin";
 
 const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
@@ -15,8 +16,7 @@ async function obtenerUsuario() {
 }
 
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && new URL(origin).origin !== request.nextUrl.origin) return NextResponse.json({ error: "Origen de solicitud no permitido." }, { status: 403 });
+  if (!requestOriginIsAllowed(request)) return NextResponse.json({ error: "Origen de solicitud no permitido." }, { status: 403 });
   const auth = await obtenerUsuario();
   if ("response" in auth) return auth.response;
   const form = await request.formData();

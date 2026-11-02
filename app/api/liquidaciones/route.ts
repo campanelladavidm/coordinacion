@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSessionClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requestOriginIsAllowed } from "@/lib/security/request-origin";
 
 type Rol = "COORDINADOR" | "SUPERVISOR" | "JEFE";
 type FormulaVinculo = { conceptoId: string; modo: "FIJO" | "PORCENTAJE"; valor: number } | { conceptoId: string; adicional: number };
@@ -44,11 +45,6 @@ function jsonError(error: unknown) {
   }
   const status = message.includes("Falta SUPABASE_SECRET_KEY") ? 503 : 500;
   return NextResponse.json({ error: message }, { status });
-}
-
-function origenPermitido(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  return !origin || new URL(origin).origin === request.nextUrl.origin;
 }
 
 function validarConceptos(value: unknown): { conceptos: Concepto[] | null; error?: string } {
@@ -119,7 +115,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!origenPermitido(request)) return NextResponse.json({ error: "Origen de solicitud no permitido." }, { status: 403 });
+  if (!requestOriginIsAllowed(request)) return NextResponse.json({ error: "Origen de solicitud no permitido." }, { status: 403 });
   const auth = await actor(request);
   if ("response" in auth) return auth.response;
   try {
@@ -162,75 +158,6 @@ export async function POST(request: NextRequest) {
       }, { onConflict: "tercerizada_id,mes,anio" }).select("id,estado,updated_at").single();
       if (changed.error) throw changed.error;
       return NextResponse.json({ liquidacion: changed.data });
-    }
-    if (body.operacion === "crear_proxima") {
-      const mes = Number(body.mes); const anio = Number(body.anio);
-      const tercerizadaId = typeof body.tercerizadaId === "string" ? body.tercerizadaId : "";
-      if (!periodoValido(mes, anio) || !tercerizadaId) return NextResponse.json({ error: "Seleccioná una tercerizada y un período válidos." }, { status: 400 });
-      const source = await admin.from("liquidaciones").select("conceptos").eq("tercerizada_id", tercerizadaId).eq("mes", mes).eq("anio", anio).maybeSingle();
-      if (source.error) throw source.error;
-      const siguiente = new Date(anio, mes, 1);
-      const nextMes = siguiente.getMonth() + 1; const nextAnio = siguiente.getFullYear();
-      const sourceConcepts = source.data?.conceptos as Concepto[] | undefined ?? [];
-      const ids = new Map<string, string>();
-      for (const concepto of sourceConcepts) ids.set(concepto.id, crypto.randomUUID());
-      const clonedConcepts = sourceConcepts.map((concepto) => ({
-        ...concepto, id: ids.get(concepto.id) ?? crypto.randomUUID(), cantidad: 0, nota: "", enlace: "",
-        ...(concepto.formula ? { formula: { ...concepto.formula, conceptoId: ids.get(concepto.formula.conceptoId) ?? concepto.formula.conceptoId } } : {}),
-      }));
-      const created = await admin.from("liquidaciones").insert({
-        tercerizada_id: tercerizadaId, mes: nextMes, anio: nextAnio,
-        conceptos: clonedConcepts,
-        estado: "BORRADOR", creado_por: auth.actor.usuarioId,
-      }).select("id,tercerizada_id,mes,anio,estado,conceptos,updated_at").single();
-      if (created.error?.code === "23505") return NextResponse.json({ error: "Ya existe una liquidación para esa tercerizada y el próximo período." }, { status: 409 });
-      if (created.error) throw created.error;
-      return NextResponse.json({ liquidacion: created.data });
-    }
-    if (body.operacion === "finalizar_periodo") {
-      const mes = Number(body.mes); const anio = Number(body.anio);
-      if (!periodoValido(mes, anio)) return NextResponse.json({ error: "Seleccioná un período válido." }, { status: 400 });
-      const companies = await admin.from("tercerizadas").select("id,activo");
-      if (companies.error) throw companies.error;
-      const existing = await admin.from("liquidaciones").select("tercerizada_id,conceptos,informacion_adicional,creado_por").eq("mes", mes).eq("anio", anio);
-      if (existing.error) throw existing.error;
-      const porEmpresa = new Map<string, { conceptos: unknown[]; informacionAdicional: string; creadoPor: string }>();
-      for (const row of existing.data ?? []) porEmpresa.set(row.tercerizada_id, { conceptos: row.conceptos, informacionAdicional: row.informacion_adicional ?? "", creadoPor: row.creado_por });
-      const fecha = new Date().toISOString();
-      const periodCompanies = (companies.data ?? []).filter((company) => company.activo || porEmpresa.has(company.id));
-      const rows = periodCompanies.map((company) => ({
-        tercerizada_id: company.id, mes, anio, estado: "FINALIZADA" as const,
-        conceptos: porEmpresa.get(company.id)?.conceptos ?? [], creado_por: porEmpresa.get(company.id)?.creadoPor ?? auth.actor.usuarioId,
-        informacion_adicional: porEmpresa.get(company.id)?.informacionAdicional ?? "",
-        finalizado_por: auth.actor.usuarioId, finalizado_at: fecha, updated_at: fecha,
-      }));
-      if (rows.length) {
-        const finalized = await admin.from("liquidaciones").upsert(rows, { onConflict: "tercerizada_id,mes,anio" });
-        if (finalized.error) throw finalized.error;
-      }
-      const proximo = new Date(Date.UTC(anio, mes, 1));
-      const nextMes = proximo.getUTCMonth() + 1; const nextAnio = proximo.getUTCFullYear();
-      const nextExisting = await admin.from("liquidaciones").select("tercerizada_id").eq("mes", nextMes).eq("anio", nextAnio);
-      if (nextExisting.error) throw nextExisting.error;
-      const nextIds = new Set((nextExisting.data ?? []).map((row) => row.tercerizada_id));
-      const activeIds = new Set((companies.data ?? []).filter((company) => company.activo).map((company) => company.id));
-      const nextDrafts = rows.filter((row) => activeIds.has(row.tercerizada_id) && !nextIds.has(row.tercerizada_id)).map((row) => {
-        const sourceConcepts = row.conceptos as Concepto[];
-        const ids = new Map<string, string>();
-        for (const concepto of sourceConcepts) ids.set(concepto.id, crypto.randomUUID());
-        return {
-          tercerizada_id: row.tercerizada_id, mes: nextMes, anio: nextAnio, estado: "BORRADOR" as const,
-          creado_por: auth.actor.usuarioId, conceptos: sourceConcepts.map((concepto) => ({
-            ...concepto, id: ids.get(concepto.id) ?? crypto.randomUUID(), cantidad: 0, nota: "", enlace: "",
-            ...(concepto.formula ? { formula: { ...concepto.formula, conceptoId: ids.get(concepto.formula.conceptoId) ?? concepto.formula.conceptoId } } : {}),
-          })),
-        };
-      });
-      if (nextDrafts.length) {
-        const seeded = await admin.from("liquidaciones").upsert(nextDrafts, { onConflict: "tercerizada_id,mes,anio", ignoreDuplicates: true });
-        if (seeded.error) throw seeded.error;
-      }
-      return NextResponse.json({ finalizadas: rows.length, proximoMes: nextMes, proximoAnio: nextAnio, copiasCreadas: nextDrafts.length });
     }
     return NextResponse.json({ error: "Operación desconocida." }, { status: 400 });
   } catch (error) { return jsonError(error); }
