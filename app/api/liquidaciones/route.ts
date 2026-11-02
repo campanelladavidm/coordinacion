@@ -51,30 +51,33 @@ function origenPermitido(request: NextRequest) {
   return !origin || new URL(origin).origin === request.nextUrl.origin;
 }
 
-function validarConceptos(value: unknown): Concepto[] | null {
-  if (!Array.isArray(value) || value.length > 300) return null;
+function validarConceptos(value: unknown): { conceptos: Concepto[] | null; error?: string } {
+  if (!Array.isArray(value)) return { conceptos: null, error: "La lista de conceptos tiene un formato invalido." };
+  if (value.length > 300) return { conceptos: null, error: "La liquidacion supera el maximo de 300 conceptos." };
   const result: Concepto[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== "object") return null;
+  for (const [index, item] of value.entries()) {
+    const numeroConcepto = index + 1;
+    if (!item || typeof item !== "object" || Array.isArray(item)) return { conceptos: null, error: `El concepto ${numeroConcepto} tiene un formato invalido.` };
     const row = item as Record<string, unknown>;
-    if (typeof row.id !== "string" || typeof row.nombre !== "string" || row.nombre.length > 120) return null;
-    if (row.tipo !== "SUMA" && row.tipo !== "RESTA") return null;
+    if (typeof row.id !== "string" || !row.id || typeof row.nombre !== "string" || row.nombre.length > 120) return { conceptos: null, error: `Revisa el identificador y el nombre del concepto ${numeroConcepto}.` };
+    if (row.tipo !== "SUMA" && row.tipo !== "RESTA") return { conceptos: null, error: `Elegi si el concepto ${numeroConcepto} suma o resta.` };
     const cantidad = Number(row.cantidad);
     const precio = Number(row.precio);
-    if (!Number.isFinite(cantidad) || cantidad < 0 || !Number.isFinite(precio) || precio < 0) return null;
+    if (!Number.isFinite(cantidad) || cantidad < 0 || !Number.isFinite(precio) || precio < 0) return { conceptos: null, error: `La cantidad o el precio del concepto ${numeroConcepto} no es valido.` };
     const formulaRaw = row.formula;
     let formula: Concepto["formula"];
-    if (formulaRaw !== undefined) {
-      if (!formulaRaw || typeof formulaRaw !== "object") return null;
+    // Older saved rows can contain JSON null for an absent formula.
+    if (formulaRaw !== undefined && formulaRaw !== null) {
+      if (typeof formulaRaw !== "object" || Array.isArray(formulaRaw)) return { conceptos: null, error: `La formula del concepto ${numeroConcepto} tiene un formato invalido.` };
       const parsed = formulaRaw as Record<string, unknown>;
-      if (typeof parsed.conceptoId !== "string") return null;
+      if (typeof parsed.conceptoId !== "string") return { conceptos: null, error: `La formula del concepto ${numeroConcepto} no tiene un concepto base valido.` };
       if (parsed.modo === "FIJO" || parsed.modo === "PORCENTAJE") {
         const valor = Number(parsed.valor);
-        if (!Number.isFinite(valor) || valor < 0) return null;
+        if (!Number.isFinite(valor) || valor < 0) return { conceptos: null, error: `El adicional de la formula del concepto ${numeroConcepto} no es valido.` };
         formula = { conceptoId: parsed.conceptoId, modo: parsed.modo, valor };
       } else {
         const adicional = Number(parsed.adicional);
-        if (!Number.isFinite(adicional) || adicional < 0) return null;
+        if (!Number.isFinite(adicional) || adicional < 0) return { conceptos: null, error: `El adicional de la formula del concepto ${numeroConcepto} no es valido.` };
         formula = { conceptoId: parsed.conceptoId, adicional };
       }
     }
@@ -86,8 +89,9 @@ function validarConceptos(value: unknown): Concepto[] | null {
     });
   }
   const ids = new Set(result.map((item) => item.id));
-  if (result.some((item) => item.formula && (!ids.has(item.formula.conceptoId) || item.formula.conceptoId === item.id))) return null;
-  return result;
+  const formulaInvalida = result.find((item) => item.formula && (!ids.has(item.formula.conceptoId) || item.formula.conceptoId === item.id));
+  if (formulaInvalida) return { conceptos: null, error: `La formula de "${formulaInvalida.nombre || "un concepto"}" apunta a un concepto base inexistente o a si misma.` };
+  return { conceptos: result };
 }
 
 function periodoValido(mes: unknown, anio: unknown) {
@@ -124,7 +128,9 @@ export async function POST(request: NextRequest) {
     if (body.operacion === "guardar") {
       const mes = Number(body.mes); const anio = Number(body.anio);
       const tercerizadaId = typeof body.tercerizadaId === "string" ? body.tercerizadaId : "";
-      const conceptos = validarConceptos(body.conceptos);
+      const validacionConceptos = validarConceptos(body.conceptos);
+      const conceptos = validacionConceptos.conceptos;
+      if (!conceptos) return NextResponse.json({ error: validacionConceptos.error ?? "Revisá los datos de los conceptos." }, { status: 400 });
       const informacionAdicional = typeof body.informacionAdicional === "string" ? body.informacionAdicional.trim().slice(0, 20000) : "";
       if (!periodoValido(mes, anio) || !tercerizadaId || !conceptos || (body.informacionAdicional !== undefined && typeof body.informacionAdicional !== "string")) return NextResponse.json({ error: "Revisá los datos de la liquidación." }, { status: 400 });
       const actual = await admin.from("liquidaciones").select("id,estado,creado_por").eq("tercerizada_id", tercerizadaId).eq("mes", mes).eq("anio", anio).maybeSingle();
