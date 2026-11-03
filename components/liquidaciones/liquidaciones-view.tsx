@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider";
+import { DescuentosDialog } from "@/components/liquidaciones/descuentos-dialog";
 
 type Estado = "BORRADOR" | "FINALIZADA";
 type FormulaVinculo = { conceptoId: string; modo: "FIJO" | "PORCENTAJE"; valor: number } | { conceptoId: string; adicional: number };
@@ -80,6 +81,7 @@ export function LiquidacionesView() {
   const [conceptoSobre, setConceptoSobre] = useState<string | null>(null);
   const conceptoArrastradoRef = useRef<string | null>(null);
   const [informacionAdicional, setInformacionAdicional] = useState("");
+  const [descuentosOpen, setDescuentosOpen] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
@@ -363,6 +365,7 @@ export function LiquidacionesView() {
         <label>Mes<select value={mes} onChange={(event) => void cambiarPeriodo(Number(event.target.value), anio)}>{nombresMeses.map((nombre, index) => <option key={nombre} value={index + 1}>{nombre}</option>)}</select></label>
         <label>Año<select value={anio} onChange={(event) => void cambiarPeriodo(mes, Number(event.target.value))}>{anios.map((year) => <option key={year}>{year}</option>)}</select></label>
         <div className="liqui-period-copy">Elegí el período y la tercerizada para consultar o editar su liquidación.</div>
+        <button type="button" className="button button-primary liqui-discounts-trigger" onClick={() => setDescuentosOpen(true)}>Descuentos</button>
       </section>
 
       <div className="liqui-layout">
@@ -412,6 +415,7 @@ export function LiquidacionesView() {
           <section className="panel liqui-tool-card liqui-documents"><div><h3>Documentos del período</h3><p>{nombresMeses[mes - 1]} {anio} · PDFs por tercerizada</p></div>{tercerizadas.map((empresa) => <div className="liqui-document-row" key={empresa.id}><span>{empresa.nombre}<small className={`liqui-status-text ${liquidaciones.find((item) => item.tercerizada_id === empresa.id)?.estado === "FINALIZADA" ? "is-final" : ""}`}>{liquidaciones.find((item) => item.tercerizada_id === empresa.id)?.estado === "FINALIZADA" ? "Finalizada" : "Borrador"}</small></span><button className="button" type="button" onClick={() => descargarPdf(empresa.id)}>Descargar PDF</button></div>)}{exportacion && <button className="button liqui-action" type="button" onClick={() => void descargarZipArchivado()} disabled={ocupado}>Descargar ZIP archivado</button>}<button className="button liqui-action" type="button" onClick={() => void exportarZip()} disabled={ocupado}>{ocupado ? "Preparando ZIP…" : exportacion ? "Actualizar ZIP archivado" : "Generar y guardar ZIP de CSV"}</button><small className="liqui-muted">Un CSV por tercerizada. Archivo: liquidaciones_{nombresMeses[mes - 1].toLocaleLowerCase("es-AR")}_{anio}.zip</small></section>
         </aside>
       </div>
+      <DescuentosDialog open={descuentosOpen} mes={mes} anio={anio} tercerizadas={tercerizadas} contextoId={contextoId} onClose={() => setDescuentosOpen(false)} />
       {imprimiendo && <article className="liqui-print-document">
         <header className="liqui-print-heading">
           <p>LIQUIDACIÓN MENSUAL</p>

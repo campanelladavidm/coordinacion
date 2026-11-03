@@ -1718,3 +1718,64 @@ html[data-theme="light"] .calculator-keys button.is-equals { border-color: #247a
   .calculator-bubble { right: 74px; bottom: 14px; width: 50px; height: 50px; border-radius: 17px; }
   .calculator-panel { right: 12px; bottom: 74px; width: min(340px, calc(100vw - 24px)); height: min(530px, calc(100dvh - 90px)); min-width: min(300px, calc(100vw - 24px)); min-height: min(440px, calc(100dvh - 90px)); }
 }
+
+.liqui-period .liqui-discounts-trigger { margin-left: auto; white-space: nowrap; }
+.liqui-discounts-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; overflow: auto; isolation: isolate; background: rgb(2 9 17 / 72%); padding: 20px; backdrop-filter: blur(5px); }
+.liqui-discounts-modal { display: flex; width: min(1180px, 96vw); height: min(790px, 88dvh); min-height: min(500px, 88dvh); flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); box-shadow: 0 24px 80px rgb(0 0 0 / 45%); }
+.liqui-discounts-header { display: flex; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--border); padding: 20px 24px 17px; }
+.liqui-discounts-header > div { display: grid; gap: 5px; }
+.liqui-discounts-eyebrow { color: var(--accent); font-size: 9px; font-weight: 750; letter-spacing: .12em; }
+.liqui-discounts-header h2 { margin: 0; color: var(--text); font-size: 20px; font-weight: 700; }
+.liqui-discounts-header p { margin: 0; color: var(--muted); font-size: 12px; }
+.liqui-discounts-close { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--muted); font-size: 21px; line-height: 1; cursor: pointer; }
+.liqui-discounts-close:hover { background: var(--surface-hover); color: var(--text); }
+.liqui-discounts-toolbar { display: grid; flex: 0 0 auto; grid-template-columns: minmax(180px, 1fr) minmax(220px, 280px) auto; align-items: end; gap: 16px; border-bottom: 1px solid var(--border); padding: 13px 22px; }
+.liqui-discounts-summary { align-self: center; color: var(--muted); font-size: 12px; }
+.liqui-discounts-summary strong { color: var(--text); font-size: 17px; }
+.liqui-discounts-toolbar > label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
+.liqui-discounts-toolbar select, .liqui-discounts-table input, .liqui-discounts-table select { box-sizing: border-box; width: 100%; min-width: 0; height: 36px; border: 1px solid var(--border); border-radius: 7px; outline: 0; background: var(--background); padding: 0 9px; color: var(--text); font: inherit; font-size: 12px; }
+.liqui-discounts-toolbar select:focus, .liqui-discounts-table input:focus, .liqui-discounts-table select:focus { border-color: #4a91ce; }
+.liqui-discounts-save-state { display: inline-flex; align-items: center; justify-self: end; gap: 7px; padding-bottom: 10px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.liqui-discounts-save-state i { width: 7px; height: 7px; border-radius: 50%; background: #7e91a4; }
+.liqui-discounts-save-state.is-saving i { background: #e4a644; }
+.liqui-discounts-save-state.is-saved i { background: #35b27d; box-shadow: 0 0 0 3px rgb(53 178 125 / 12%); }
+.liqui-discounts-save-state.is-error i { background: #e26d7a; }
+.liqui-discounts-table-wrap { flex: 1 1 auto; overflow: auto; padding: 15px 21px 10px; }
+.liqui-discounts-table { width: 100%; min-width: 900px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.liqui-discounts-table th { position: sticky; z-index: 1; top: 0; border-bottom: 1px solid var(--border); background: var(--surface); padding: 10px 9px; color: var(--muted); font-size: 10px; font-weight: 700; text-align: left; }
+.liqui-discounts-table td { border-bottom: 1px solid var(--border); padding: 9px; color: var(--text); font-size: 12px; vertical-align: middle; }
+.liqui-discounts-table th:nth-child(1), .liqui-discounts-table td:nth-child(1) { width: 110px; }
+.liqui-discounts-table th:nth-child(2), .liqui-discounts-table td:nth-child(2) { width: 150px; }
+.liqui-discounts-table th:nth-child(3), .liqui-discounts-table td:nth-child(3), .liqui-discounts-table th:nth-child(4), .liqui-discounts-table td:nth-child(4) { width: 190px; }
+.liqui-discounts-table th:nth-child(6), .liqui-discounts-table td:nth-child(6) { width: 142px; }
+.liqui-discounts-table td > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liqui-discounts-month { color: #82bdf0; font-weight: 650; }
+.liqui-discounts-reason { max-width: 100%; }
+.liqui-discounts-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.liqui-discounts-actions .button { min-height: 30px; padding: 0 9px; font-size: 10px; }
+.liqui-discounts-delete { width: 29px; height: 29px; border: 1px solid rgb(197 88 101 / 32%); border-radius: 7px; background: rgb(197 88 101 / 9%); color: #df7d88; font-size: 18px; line-height: 1; cursor: pointer; }
+.liqui-discounts-delete:hover { border-color: #c95e6e; background: rgb(197 88 101 / 16%); }
+.liqui-discounts-delete:disabled { opacity: .5; cursor: wait; }
+.liqui-discounts-empty { height: 150px; color: var(--muted) !important; text-align: center; }
+.liqui-discounts-footer { display: flex; flex: 0 0 auto; align-items: center; gap: 12px; border-top: 1px solid var(--border); padding: 13px 22px; }
+.liqui-discounts-footer .button:last-child { margin-left: auto; }
+.liqui-discounts-footer .button { min-height: 36px; }
+.liqui-discounts-error-message, .liqui-discounts-error { color: #f18a96; font-size: 11px; }
+.liqui-discounts-error { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px; }
+.liqui-discounts-loading { display: grid; flex: 1; place-items: center; color: var(--muted); font-size: 12px; }
+html[data-theme="light"] .liqui-discounts-modal { background: #fff; }
+html[data-theme="light"] .liqui-discounts-table th { background: #fff; }
+html[data-theme="light"] .liqui-discounts-month { color: #286fa8; }
+html[data-theme="light"] .liqui-discounts-delete { border-color: #e8c3c7; background: #fff5f6; color: #ae4351; }
+@media (max-width: 700px) {
+  .liqui-period .liqui-discounts-trigger { width: 100%; margin-left: 0; }
+  .liqui-discounts-backdrop { align-items: end; padding: 7px; }
+  .liqui-discounts-modal { width: 100%; height: 94dvh; max-height: 94dvh; min-height: 0; border-radius: 13px; }
+  .liqui-discounts-header { padding: 17px 16px 14px; }
+  .liqui-discounts-header h2 { font-size: 17px; }
+  .liqui-discounts-toolbar { grid-template-columns: 1fr; gap: 10px; padding: 12px 16px; }
+  .liqui-discounts-save-state { justify-self: start; padding-bottom: 0; }
+  .liqui-discounts-table-wrap { padding: 10px 8px; }
+  .liqui-discounts-footer { flex-wrap: wrap; padding: 11px 13px; }
+  .liqui-discounts-error-message { order: 3; width: 100%; }
+}
