@@ -35,14 +35,36 @@ function CalculatorPanel() {
   const [memory, setMemory] = useState(0);
   const gesture = useRef<Gesture | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-
+  const pressRef = useRef(press);
+  useEffect(() => { pressRef.current = press; });
   useEffect(() => {
     if (!open) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+    const handleKeyboard = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); return; }
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return;
+
+      let key: string | null = null;
+      if (/^\d$/.test(event.key)) key = event.key;
+      else if (event.key === "." || event.key === "," || event.code === "NumpadDecimal") key = ",";
+      else if (event.key === "+") key = "+";
+      else if (event.key === "-") key = String.fromCharCode(0x2212);
+      else if (event.key === "*") key = String.fromCharCode(0x00d7);
+      else if (event.key === "/") key = String.fromCharCode(0x00f7);
+      else if (event.key === "Enter" || event.key === "=") key = "=";
+      else if (event.key === "Backspace") key = String.fromCharCode(0x232b);
+      else if (event.key === "Delete") key = "CE";
+      else if (event.key.toLowerCase() === "c") key = "C";
+
+      if (key !== null) {
+        event.preventDefault();
+        pressRef.current(key);
+      }
     };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
   }, [open]);
 
   function clampRect(next: Rect): Rect {
