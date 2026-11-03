@@ -35,6 +35,7 @@ function periodoValido(mes: unknown, anio: unknown) {
 function errorBase(error: unknown) {
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
   if (code === "42P01") return NextResponse.json({ error: "Falta aplicar la migración 202611030001_liquidaciones_descuentos.sql en Supabase." }, { status: 503 });
+  if (code === "42703") return NextResponse.json({ error: "Falta aplicar la migración 202611040001_liquidaciones_descuentos_numero_cliente.sql en Supabase." }, { status: 503 });
   const message = error instanceof Error ? error.message : "No se pudieron guardar los descuentos.";
   if (message.includes("Falta SUPABASE_SECRET_KEY")) return NextResponse.json({ error: message }, { status: 503 });
   return NextResponse.json({ error: message }, { status: 500 });
@@ -49,9 +50,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const admin = createAdminClient();
-    const result = await admin.from("liquidaciones_descuentos").select("id,ticket,realiza_id,pertenece_id,motivo,created_at").eq("mes", mes).eq("anio", anio).order("created_at").order("id");
+    const result = await admin.from("liquidaciones_descuentos").select("id,ticket,numero_cliente,realiza_id,pertenece_id,motivo,created_at").eq("mes", mes).eq("anio", anio).order("created_at").order("id");
     if (result.error) throw result.error;
-    const descuentos = (result.data ?? []).map((row) => ({ id: row.id, ticket: row.ticket, realizaId: row.realiza_id ?? "", perteneceId: row.pertenece_id ?? "", motivo: row.motivo }));
+    const descuentos = (result.data ?? []).map((row) => ({ id: row.id, ticket: row.ticket, numeroCliente: row.numero_cliente ?? "", realizaId: row.realiza_id ?? "", perteneceId: row.pertenece_id ?? "", motivo: row.motivo }));
     return NextResponse.json({ descuentos });
   } catch (error) { return errorBase(error); }
 }
@@ -67,10 +68,11 @@ export async function POST(request: NextRequest) {
     const anio = Number(body.anio);
     const id = typeof body.id === "string" ? body.id : "";
     const ticket = typeof body.ticket === "string" ? body.ticket.trim() : "";
+    const numeroCliente = typeof body.numeroCliente === "string" ? body.numeroCliente.trim() : "";
     const realizaId = typeof body.realizaId === "string" ? body.realizaId : "";
     const perteneceId = typeof body.perteneceId === "string" ? body.perteneceId : "";
     const motivo = typeof body.motivo === "string" ? body.motivo.trim() : "";
-    if (!periodoValido(mes, anio) || !uuid.test(id) || ticket.length > 80 || motivo.length > 1500
+    if (!periodoValido(mes, anio) || !uuid.test(id) || ticket.length > 80 || numeroCliente.length > 80 || motivo.length > 1500
       || (realizaId && !uuid.test(realizaId)) || (perteneceId && !uuid.test(perteneceId))) {
       return NextResponse.json({ error: "Revisá los datos del descuento." }, { status: 400 });
     }
@@ -88,13 +90,13 @@ export async function POST(request: NextRequest) {
     if (existing.data && (existing.data.mes !== mes || existing.data.anio !== anio)) {
       return NextResponse.json({ error: "El descuento no pertenece al período seleccionado." }, { status: 404 });
     }
-    const values = { mes, anio, ticket, realiza_id: realizaId || null, pertenece_id: perteneceId || null, motivo, actualizado_por: auth.usuarioId, updated_at: new Date().toISOString() };
+    const values = { mes, anio, ticket, numero_cliente: numeroCliente, realiza_id: realizaId || null, pertenece_id: perteneceId || null, motivo, actualizado_por: auth.usuarioId, updated_at: new Date().toISOString() };
     const saved = existing.data
-      ? await admin.from("liquidaciones_descuentos").update(values).eq("id", id).eq("mes", mes).eq("anio", anio).select("id,ticket,realiza_id,pertenece_id,motivo").single()
-      : await admin.from("liquidaciones_descuentos").insert({ id, ...values, creado_por: auth.usuarioId }).select("id,ticket,realiza_id,pertenece_id,motivo").single();
+      ? await admin.from("liquidaciones_descuentos").update(values).eq("id", id).eq("mes", mes).eq("anio", anio).select("id,ticket,numero_cliente,realiza_id,pertenece_id,motivo").single()
+      : await admin.from("liquidaciones_descuentos").insert({ id, ...values, creado_por: auth.usuarioId }).select("id,ticket,numero_cliente,realiza_id,pertenece_id,motivo").single();
     if (saved.error) throw saved.error;
     const row = saved.data;
-    return NextResponse.json({ descuento: { id: row.id, ticket: row.ticket, realizaId: row.realiza_id ?? "", perteneceId: row.pertenece_id ?? "", motivo: row.motivo } });
+    return NextResponse.json({ descuento: { id: row.id, ticket: row.ticket, numeroCliente: row.numero_cliente ?? "", realizaId: row.realiza_id ?? "", perteneceId: row.pertenece_id ?? "", motivo: row.motivo } });
   } catch (error) { return errorBase(error); }
 }
 

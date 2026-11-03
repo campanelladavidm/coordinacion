@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 export type DescuentoLiquidacion = {
   id: string;
   ticket: string;
+  numeroCliente: string;
   realizaId: string;
   perteneceId: string;
   motivo: string;
@@ -111,13 +112,13 @@ export function DescuentosDialog({ open, mes, anio, tercerizadas, contextoId, on
     return () => window.clearTimeout(timeout);
   }, [open, periodo, periodoCargado, filas, errorCarga, guardarFila]);
 
-  function actualizarFila(id: string, campo: "ticket" | "realizaId" | "perteneceId" | "motivo", value: string) {
+  function actualizarFila(id: string, campo: "ticket" | "numeroCliente" | "realizaId" | "perteneceId" | "motivo", value: string) {
     setFilas((current) => current.map((row) => row.id === id ? { ...row, [campo]: value } : row));
     setEstadoGuardado("idle"); setErrorGuardado("");
   }
 
   function agregarFila() {
-    const row = { id: nuevoId(), ticket: "", realizaId: "", perteneceId: "", motivo: "" };
+    const row = { id: nuevoId(), ticket: "", numeroCliente: "", realizaId: "", perteneceId: "", motivo: "" };
     setFilas((current) => [...current, row]);
     setEnEdicion(row.id); setFiltroTercerizada(""); setErrorCarga("");
   }
@@ -186,19 +187,20 @@ export function DescuentosDialog({ open, mes, anio, tercerizadas, contextoId, on
         <span className={`liqui-discounts-save-state is-${estadoGuardado}`}><i aria-hidden="true"/>{labelEstado}</span>
       </div>
       {errorCarga ? <div className="liqui-discounts-error" role="alert"><span>{errorCarga}</span><button type="button" className="button" onClick={() => { setErrorCarga(""); setPeriodoCargado(""); setIntentoCarga((value) => value + 1); }}>Reintentar</button></div> : periodoCargado !== periodo ? <div className="liqui-discounts-loading">Cargando descuentos…</div> : <>
-        <div className="liqui-discounts-table-wrap"><table className="liqui-discounts-table"><thead><tr><th>Mes</th><th>Ticket</th><th>Realiza</th><th>Pertenece a</th><th>Motivo</th><th>Acciones</th></tr></thead><tbody>
+        <div className="liqui-discounts-table-wrap"><table className="liqui-discounts-table"><thead><tr><th>Mes</th><th>Ticket</th><th>Número de cliente</th><th>Realiza</th><th>Pertenece a</th><th>Motivo</th><th>Acciones</th></tr></thead><tbody>
           {filasFiltradas.map((row) => {
             const editing = enEdicion === row.id;
             return <tr key={row.id}>
               <td><span className="liqui-discounts-month">{mesNombre}</span></td>
               <td>{editing ? <input aria-label="Ticket" inputMode="numeric" maxLength={80} value={row.ticket} onChange={(event) => actualizarFila(row.id, "ticket", event.target.value)} placeholder="Número de ticket"/> : <span>{row.ticket || "—"}</span>}</td>
+              <td>{editing ? <input aria-label="Número de cliente" inputMode="numeric" maxLength={80} value={row.numeroCliente} onChange={(event) => actualizarFila(row.id, "numeroCliente", event.target.value)} placeholder="Número de cliente"/> : <span>{row.numeroCliente || "—"}</span>}</td>
               <td>{editing ? <select aria-label="Realiza" value={row.realizaId} onChange={(event) => actualizarFila(row.id, "realizaId", event.target.value)}><option value="">Seleccionar</option>{tercerizadas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select> : <span>{byId.get(row.realizaId) ?? "—"}</span>}</td>
               <td>{editing ? <select aria-label="Pertenece a" value={row.perteneceId} onChange={(event) => actualizarFila(row.id, "perteneceId", event.target.value)}><option value="">Seleccionar</option>{tercerizadas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select> : <span>{byId.get(row.perteneceId) ?? "—"}</span>}</td>
-              <td>{editing ? <input aria-label="Motivo" maxLength={1500} value={row.motivo} onChange={(event) => actualizarFila(row.id, "motivo", event.target.value)} placeholder="Motivo del descuento"/> : <span className="liqui-discounts-reason">{row.motivo || "—"}</span>}</td>
+              <td className="liqui-discounts-motive">{editing ? <input aria-label="Motivo" maxLength={1500} value={row.motivo} onChange={(event) => actualizarFila(row.id, "motivo", event.target.value)} placeholder="Motivo del descuento"/> : <span className="liqui-discounts-reason">{row.motivo || "—"}</span>}</td>
               <td><div className="liqui-discounts-actions"><button type="button" className="button" onClick={() => setEnEdicion(editing ? null : row.id)}>{editing ? "Listo" : "Editar"}</button><button type="button" className="liqui-discounts-delete" aria-label={`Eliminar descuento del ticket ${row.ticket || "sin ticket"}`} title="Eliminar fila" disabled={eliminando === row.id} onClick={() => void eliminarFila(row)}>×</button></div></td>
             </tr>;
           })}
-          {!filasFiltradas.length && <tr><td className="liqui-discounts-empty" colSpan={6}>{filas.length ? "No hay descuentos que coincidan con el filtro." : "Todavía no hay descuentos cargados para este período."}</td></tr>}
+          {!filasFiltradas.length && <tr><td className="liqui-discounts-empty" colSpan={7}>{filas.length ? "No hay descuentos que coincidan con el filtro." : "Todavía no hay descuentos cargados para este período."}</td></tr>}
         </tbody></table></div>
         <footer className="liqui-discounts-footer"><button type="button" className="button button-primary" onClick={agregarFila}>＋ Agregar descuento</button>{errorGuardado && <span className="liqui-discounts-error-message" role="alert">{errorGuardado}</span>}<button type="button" className="button" onClick={() => void cerrar()}>{estadoGuardado === "saving" ? "Esperar guardado y cerrar" : "Cerrar"}</button></footer>
       </>}

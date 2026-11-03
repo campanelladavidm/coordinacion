@@ -1748,13 +1748,16 @@ html[data-theme="light"] .calculator-keys button.is-equals { border-color: #247a
 .liqui-discounts-save-state.is-saved i { background: #35b27d; box-shadow: 0 0 0 3px rgb(53 178 125 / 12%); }
 .liqui-discounts-save-state.is-error i { background: #e26d7a; }
 .liqui-discounts-table-wrap { flex: 1 1 auto; overflow: auto; padding: 15px 21px 10px; }
-.liqui-discounts-table { width: 100%; min-width: 900px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.liqui-discounts-table { width: 100%; min-width: 1050px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .liqui-discounts-table th { position: sticky; z-index: 1; top: 0; border-bottom: 1px solid var(--border); background: var(--surface); padding: 10px 9px; color: var(--muted); font-size: 10px; font-weight: 700; text-align: left; }
 .liqui-discounts-table td { border-bottom: 1px solid var(--border); padding: 9px; color: var(--text); font-size: 12px; vertical-align: middle; }
 .liqui-discounts-table th:nth-child(1), .liqui-discounts-table td:nth-child(1) { width: 110px; }
 .liqui-discounts-table th:nth-child(2), .liqui-discounts-table td:nth-child(2) { width: 150px; }
-.liqui-discounts-table th:nth-child(3), .liqui-discounts-table td:nth-child(3), .liqui-discounts-table th:nth-child(4), .liqui-discounts-table td:nth-child(4) { width: 190px; }
-.liqui-discounts-table th:nth-child(6), .liqui-discounts-table td:nth-child(6) { width: 142px; }
+.liqui-discounts-table th:nth-child(3), .liqui-discounts-table td:nth-child(3) { width: 150px; }
+.liqui-discounts-table th:nth-child(4), .liqui-discounts-table td:nth-child(4), .liqui-discounts-table th:nth-child(5), .liqui-discounts-table td:nth-child(5) { width: 190px; }
+.liqui-discounts-table th:nth-child(7), .liqui-discounts-table td:nth-child(7) { width: 142px; }
+.liqui-discounts-table td.liqui-discounts-motive input { display: block; box-sizing: border-box; width: 100% !important; max-width: none; }
+.liqui-discounts-table th:nth-child(7) { text-align: right !important; }
 .liqui-discounts-table td > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .liqui-discounts-month { color: #82bdf0; font-weight: 650; }
 .liqui-discounts-reason { max-width: 100%; }
