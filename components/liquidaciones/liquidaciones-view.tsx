@@ -11,12 +11,25 @@ type Tercerizada = { id: string; nombre: string };
 type Liquidacion = { id: string; tercerizada_id: string; mes: number; anio: number; estado: Estado; conceptos: Concepto[]; informacion_adicional: string; finalizado_at: string | null };
 type Exportacion = { nombre_archivo: string; created_at: string } | null;
 const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const clavePeriodoLiqui = "liqui:ultimo-periodo";
 const formatoMoneda = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 2 });
 const numero = (value: number) => new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(value);
 const nuevoId = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const etiquetaAdicional = (formula: FormulaVinculo) => "modo" in formula
   ? formula.modo === "PORCENTAJE" ? `${formula.valor < 0 ? "−" : "+"} ${numero(Math.abs(formula.valor))}%` : `+ ${formatoMoneda.format(formula.valor)}`
   : `+ ${formatoMoneda.format(formula.adicional)}`;
+function duplicarConceptos(origen: Concepto[], copiarPrecios: boolean) {
+  const ids = new Map<string, string>(origen.map((item) => [item.id, nuevoId()] as const));
+  return origen.map((item) => ({
+    ...item,
+    id: ids.get(item.id) ?? nuevoId(),
+    cantidad: 0,
+    precio: copiarPrecios ? Number(item.precio) : 0,
+    nota: "",
+    enlace: copiarPrecios ? item.enlace : "",
+    ...(copiarPrecios && item.formula ? { formula: { ...item.formula, conceptoId: ids.get(item.formula.conceptoId) ?? item.formula.conceptoId } } : { formula: undefined }),
+  }));
+}
 
 async function api<T>(url: string, init?: RequestInit, contextoId?: string): Promise<T> {
   const response = await fetch(url, {
@@ -125,10 +138,24 @@ export function LiquidacionesView() {
 
   useEffect(() => {
     const hoy = new Date();
-    setMes(hoy.getMonth() + 1);
-    setAnio(hoy.getFullYear());
+    let mesInicial = hoy.getMonth() + 1;
+    let anioInicial = hoy.getFullYear();
+    try {
+      const periodoGuardado = localStorage.getItem(clavePeriodoLiqui);
+      if (periodoGuardado) {
+        const periodo = JSON.parse(periodoGuardado) as { mes?: unknown; anio?: unknown };
+        if (Number.isInteger(periodo.mes) && Number(periodo.mes) >= 1 && Number(periodo.mes) <= 12) mesInicial = Number(periodo.mes);
+        if (Number.isInteger(periodo.anio) && Number(periodo.anio) >= 2000 && Number(periodo.anio) <= 2100) anioInicial = Number(periodo.anio);
+      }
+    } catch {}
+    setMes(mesInicial);
+    setAnio(anioInicial);
     setPeriodoListo(true);
   }, []);
+  useEffect(() => {
+    if (!periodoListo) return;
+    try { localStorage.setItem(clavePeriodoLiqui, JSON.stringify({ mes, anio })); } catch {}
+  }, [mes, anio, periodoListo]);
   useEffect(() => { if (periodoListo) void cargar(false); }, [cargar, periodoListo]);
   const liquidacionActual = liquidaciones.find((item) => item.tercerizada_id === tercerizadaId);
   const estadoActual: Estado = liquidacionActual?.estado ?? "BORRADOR";
@@ -287,19 +314,37 @@ export function LiquidacionesView() {
     const origen = liquidaciones.find((item) => item.tercerizada_id === tercerizadaImportarId);
     if (!origen?.conceptos.length) { setError("La tercerizada seleccionada todavía no tiene conceptos guardados en este período."); return; }
     if (conceptos.length && !window.confirm("Se reemplazarán los conceptos actuales de esta liquidación. ¿Querés continuar?")) return;
-    const ids = new Map<string, string>(origen.conceptos.map((item) => [item.id, nuevoId()] as const));
-    const imported = origen.conceptos.map((item) => ({
-      ...item,
-      id: ids.get(item.id) ?? nuevoId(),
-      cantidad: 0,
-      precio: modoImportacion === "COMPLETO" ? Number(item.precio) : 0,
-      nota: "",
-      enlace: modoImportacion === "COMPLETO" ? item.enlace : "",
-      ...(modoImportacion === "COMPLETO" && item.formula ? { formula: { ...item.formula, conceptoId: ids.get(item.formula.conceptoId) ?? item.formula.conceptoId } } : { formula: undefined }),
-    }));
+    const imported = duplicarConceptos(origen.conceptos, modoImportacion === "COMPLETO");
     setConceptos(imported);
     setMensaje(`Se importaron ${imported.length} conceptos de ${tercerizadas.find((item) => item.id === tercerizadaImportarId)?.nombre}.`);
     setError("");
+  }
+
+  async function importarConceptosMesAnterior() {
+    if (!tercerizadaId || soloLectura || ocupado) return;
+    const mesAnterior = mes === 1 ? 12 : mes - 1;
+    const anioAnterior = mes === 1 ? anio - 1 : anio;
+    setOcupado(true); setError(""); setMensaje("Buscando conceptos del mes anterior…");
+    try {
+      const data = await api<{ liquidaciones: Liquidacion[] }>(`/api/liquidaciones?mes=${mesAnterior}&anio=${anioAnterior}`, undefined, contextoId);
+      const origen = data.liquidaciones.find((item) => item.tercerizada_id === tercerizadaId);
+      if (!origen?.conceptos.length) {
+        setMensaje("");
+        setError(`No hay conceptos guardados para ${tercerizadas.find((item) => item.id === tercerizadaId)?.nombre} en ${nombresMeses[mesAnterior - 1]} ${anioAnterior}.`);
+        return;
+      }
+      if (conceptos.length && !window.confirm("Se reemplazarán los conceptos actuales de esta liquidación. ¿Querés continuar?")) {
+        setMensaje("");
+        return;
+      }
+      const imported = duplicarConceptos(origen.conceptos, true);
+      setConceptos(imported);
+      setMensaje(`Se copiaron ${imported.length} conceptos y precios de ${nombresMeses[mesAnterior - 1]} ${anioAnterior}.`);
+      setError("");
+    } catch (cause) {
+      setMensaje("");
+      setError(cause instanceof Error ? cause.message : "No se pudieron importar los conceptos del mes anterior.");
+    } finally { setOcupado(false); }
   }
 
   const csvArchivos = useMemo(() => tercerizadas.map((empresa) => {
@@ -411,7 +456,7 @@ export function LiquidacionesView() {
         <aside className="liqui-tools">
           <section className="panel liqui-tool-card"><h3>Calculadora de aumento</h3><p>Calculá un precio con aumento porcentual.</p><div className="liqui-calc-inputs"><label>Valor base<input type="number" min="0" value={base} onChange={(event) => setBase(event.target.value)} placeholder="0" /></label><label>Aumento %<input type="number" min="0" value={porcentaje} onChange={(event) => setPorcentaje(event.target.value)} placeholder="0" /></label></div><div className="liqui-calc-result"><span>Precio actualizado</span><strong>{formatoMoneda.format(Number(precioCalculado) || 0)}</strong></div><button className="button" type="button" onClick={aplicarAumento}>Calcular</button></section>
           <section className="panel liqui-tool-card liqui-linked-tool"><h3>Precio vinculado</h3><p>Sumá un monto fijo o un porcentaje al precio de otro concepto.</p><label>Concepto base<select value={conceptoReferencia} onChange={(event) => setConceptoReferencia(event.target.value)}><option value="">Seleccionar concepto</option>{conceptos.map((item) => <option key={item.id} value={item.id}>{item.nombre || "Concepto sin nombre"}</option>)}</select></label><label>Nuevo concepto<input value={nuevoNombre} onChange={(event) => setNuevoNombre(event.target.value)} placeholder="Ej.: Instalación adicional" /></label><label>Tipo de concepto<select value={tipoConceptoVinculado} onChange={(event) => setTipoConceptoVinculado(event.target.value as "SUMA" | "RESTA")}><option value="SUMA">Suma</option><option value="RESTA">Resta</option></select></label><label>Tipo de adicional<select value={modoVinculo} onChange={(event) => setModoVinculo(event.target.value as "FIJO" | "PORCENTAJE")}><option value="FIJO">Monto fijo</option><option value="PORCENTAJE">Porcentaje del precio base</option></select></label><label>{modoVinculo === "PORCENTAJE" ? "Porcentaje (%)" : "Importe fijo"}<input type="number" min={modoVinculo === "PORCENTAJE" ? -100 : 0} value={precioAdicional} onChange={(event) => setPrecioAdicional(event.target.value)} placeholder={modoVinculo === "PORCENTAJE" ? "35" : "7500"} /></label><button className="button" type="button" onClick={agregarDerivado} disabled={soloLectura}>Agregar concepto vinculado</button>{conceptosVinculados.length > 0 && <div className="liqui-linked-history"><strong>Precios vinculados</strong>{conceptosVinculados.map((item) => { const formula = item.formula!; const baseConcepto = conceptos.find((candidate) => candidate.id === formula.conceptoId); return <div className="liqui-linked-history-row" key={item.id}><span>{item.nombre}<small>{item.tipo === "RESTA" ? "Resta" : "Suma"} · {baseConcepto?.nombre ?? "Concepto base"} {etiquetaAdicional(formula)}</small></span><b>{formatoMoneda.format(item.precio)}</b></div>; })}</div>}</section>
-          <section className="panel liqui-tool-card liqui-import-card"><h3>Importar conceptos</h3><p>Copiá conceptos de otra tercerizada de este período.</p><label>Liquidación de origen<select value={tercerizadaImportarId} onChange={(event) => setTercerizadaImportarId(event.target.value)}><option value="">Elegir tercerizada</option>{tercerizadas.filter((item) => item.id !== tercerizadaId && (liquidaciones.find((liq) => liq.tercerizada_id === item.id)?.conceptos.length ?? 0) > 0).map((empresa) => { const origen = liquidaciones.find((liq) => liq.tercerizada_id === empresa.id); return <option key={empresa.id} value={empresa.id}>{empresa.nombre} · {origen?.estado === "FINALIZADA" ? "Finalizada" : "Borrador"}</option>; })}</select></label><label>Qué copiar<select value={modoImportacion} onChange={(event) => setModoImportacion(event.target.value as "COMPLETO" | "SOLO_CONCEPTOS")}><option value="COMPLETO">Conceptos y precios</option><option value="SOLO_CONCEPTOS">Solo conceptos</option></select></label><small>Las cantidades se reinician en cero. Importar reemplaza la lista actual.</small><button className="button liqui-action" type="button" onClick={importarConceptos} disabled={soloLectura || !tercerizadaImportarId}>Importar conceptos</button></section>
+          <section className="panel liqui-tool-card liqui-import-card"><h3>Importar conceptos</h3><p>Copiá conceptos de otra tercerizada de este período.</p><label>Liquidación de origen<select value={tercerizadaImportarId} onChange={(event) => setTercerizadaImportarId(event.target.value)}><option value="">Elegir tercerizada</option>{tercerizadas.filter((item) => item.id !== tercerizadaId && (liquidaciones.find((liq) => liq.tercerizada_id === item.id)?.conceptos.length ?? 0) > 0).map((empresa) => { const origen = liquidaciones.find((liq) => liq.tercerizada_id === empresa.id); return <option key={empresa.id} value={empresa.id}>{empresa.nombre} · {origen?.estado === "FINALIZADA" ? "Finalizada" : "Borrador"}</option>; })}</select></label><label>Qué copiar<select value={modoImportacion} onChange={(event) => setModoImportacion(event.target.value as "COMPLETO" | "SOLO_CONCEPTOS")}><option value="COMPLETO">Conceptos y precios</option><option value="SOLO_CONCEPTOS">Solo conceptos</option></select></label><small>Las cantidades se reinician en cero. Importar reemplaza la lista actual.</small><button className="button liqui-action" type="button" onClick={importarConceptos} disabled={soloLectura || !tercerizadaImportarId}>Importar conceptos</button><button className="button liqui-action" type="button" onClick={() => void importarConceptosMesAnterior()} disabled={soloLectura || ocupado || !tercerizadaId}>Conceptos y precios mes anterior = tercerizada</button></section>
           <section className="panel liqui-tool-card liqui-documents"><div><h3>Documentos del período</h3><p>{nombresMeses[mes - 1]} {anio} · PDFs por tercerizada</p></div>{tercerizadas.map((empresa) => <div className="liqui-document-row" key={empresa.id}><span>{empresa.nombre}<small className={`liqui-status-text ${liquidaciones.find((item) => item.tercerizada_id === empresa.id)?.estado === "FINALIZADA" ? "is-final" : ""}`}>{liquidaciones.find((item) => item.tercerizada_id === empresa.id)?.estado === "FINALIZADA" ? "Finalizada" : "Borrador"}</small></span><button className="button" type="button" onClick={() => descargarPdf(empresa.id)}>Descargar PDF</button></div>)}{exportacion && <button className="button liqui-action" type="button" onClick={() => void descargarZipArchivado()} disabled={ocupado}>Descargar ZIP archivado</button>}<button className="button liqui-action" type="button" onClick={() => void exportarZip()} disabled={ocupado}>{ocupado ? "Preparando ZIP…" : exportacion ? "Actualizar ZIP archivado" : "Generar y guardar ZIP de CSV"}</button><small className="liqui-muted">Un CSV por tercerizada. Archivo: liquidaciones_{nombresMeses[mes - 1].toLocaleLowerCase("es-AR")}_{anio}.zip</small></section>
         </aside>
       </div>
