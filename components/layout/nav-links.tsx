@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { SessionControls } from "@/components/layout/session-controls";
 
 type MenuIcon = "calendar" | "list" | "settings" | "users" | "chart" | "notes" | "liqui" | "tasks";
 
@@ -52,8 +53,6 @@ function todayInArgentina() {
 
 export function NavLinks() {
   const pathname = usePathname();
-  const [openAtPath, setOpenAtPath] = useState<string | null>(null);
-  const mobileOpen = openAtPath === pathname;
   const { rolDemo } = useCoordinacionesDemo();
   const dateFromRoute = pathname.match(/^\/coordinaciones\/(\d{4}-\d{2}-\d{2})/)?.[1];
   const coordinationHref = `/coordinaciones/${dateFromRoute ?? todayInArgentina()}`;
@@ -65,15 +64,14 @@ export function NavLinks() {
     return true;
   });
 
-  if (pathname === "/login") return null;
+  if (pathname === "/login") return <div className="app-sidebar-login-theme"><ThemeToggle /></div>;
 
   return (
-    <>
-    <button type="button" className="mobile-menu-toggle" aria-expanded={mobileOpen} aria-controls="primary-navigation" onClick={() => setOpenAtPath(mobileOpen ? null : pathname)}>
-      <span className="mobile-menu-toggle-icon" aria-hidden="true">{mobileOpen ? "×" : "☰"}</span>
-      <span>Menú</span>
-    </button>
-    <nav id="primary-navigation" className={`nav-list${mobileOpen ? " is-open" : ""}`} aria-label="Navegación principal">
+    <aside className="app-sidebar" aria-label="Navegación principal">
+    <a className="sidebar-brand" href="/" aria-label="Coordi Westnet, inicio">
+      <img src="/brand/coordi-westnet.png" alt="Coordi Westnet" />
+    </a>
+    <nav id="primary-navigation" className="nav-list">
       {visibles.map((link) => {
         const href = link.href === "/coordinaciones" ? coordinationHref : link.href;
         const isActive = link.href === "/"
@@ -84,13 +82,16 @@ export function NavLinks() {
               ? pathname.startsWith("/liqui")
             : pathname.startsWith(link.href);
         return (
-          <Link key={link.href} className={`nav-link${isActive ? " active" : ""}`} href={href} aria-current={isActive ? "page" : undefined} onClick={() => setOpenAtPath(null)}>
+          <Link key={link.href} className={`nav-link${isActive ? " active" : ""}`} href={href} aria-current={isActive ? "page" : undefined} title={link.label}>
             <span className="nav-icon"><Icon name={link.icon} /></span>
             <span className="nav-text">{link.label}</span>
           </Link>
         );
       })}
     </nav>
-    </>
+    <div className="app-sidebar-bottom">
+      <SessionControls />
+    </div>
+    </aside>
   );
 }

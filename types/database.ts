@@ -21,6 +21,10 @@ export type Database = {
       zonas: Table<CatalogRow & { latitud: number | null; longitud: number | null }, CatalogInsert & { latitud?: number | null; longitud?: number | null }>;
       estados: Table<CatalogRow, CatalogInsert>;
       extras: Table<CatalogRow, CatalogInsert>;
+      modelos_equipo: Table<
+        { id: string; modelo: string; precio_unitario: number; activo: boolean; orden: number; created_at: string; updated_at: string },
+        { id?: string; modelo: string; precio_unitario: number; activo?: boolean; orden?: number; created_at?: string; updated_at?: string }
+      >;
       coordinaciones: Table<
         { id: string; fecha: string; ticket: string; cliente: string; tercerizada_id: string | null; cuadrilla_id: string | null; horario_id: string | null; tecnologia_id: string; categoria_id: string; observaciones: string | null; zona_id: string | null; estado_id: string; orden: number; ubicacion: string | null; creado_por: string | null; created_at: string; updated_at: string },
         { id?: string; fecha: string; ticket: string; cliente: string; tercerizada_id?: string | null; cuadrilla_id?: string | null; horario_id?: string | null; tecnologia_id: string; categoria_id: string; observaciones?: string | null; zona_id?: string | null; estado_id: string; orden?: number; ubicacion?: string | null; creado_por?: string | null; created_at?: string; updated_at?: string }

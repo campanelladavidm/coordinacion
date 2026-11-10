@@ -13,6 +13,7 @@ const catalogs = [
   { slug: "zonas", name: "Zonas", quantity: "zonas", label: "zonas cargadas" },
   { slug: "estados", name: "Estados", quantity: "estados", label: "estados cargados" },
   { slug: "extras", name: "Extras", quantity: "extras", label: "extras cargados" },
+  { slug: "modelos-equipo", name: "Modelos de equipo", label: "Modelos y precios unitarios" },
   { slug: "feriados", name: "Feriados y personal interno", label: "Días feriados y equipos internos asignados" },
 ] as const;
 

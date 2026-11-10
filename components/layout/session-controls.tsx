@@ -4,6 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useCoordinacionesDemo, type ContextoUsuario } from "@/components/providers/demo-data-provider";
 import { createClient } from "@/lib/supabase/client";
+import { TaskNotifications } from "@/components/layout/task-notifications";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 export function SessionControls() {
   const pathname = usePathname();
@@ -45,14 +47,20 @@ export function SessionControls() {
 
   return usuarioActual ? (
     <div className="session-controls">
+      <div className="session-account">
+      {rolAutenticado === "JEFE" && <label className="user-context-select"><span>Simular usuario</span><select aria-label="Simular usuario" title="Simular usuario" value={usuarioEnContexto?.id ?? ""} onChange={(event) => cambiarContexto(event.target.value)}><option value="">{usuarioActual.nombre}</option>{usuarios.filter((user) => user.id !== usuarioActual.id).map((user) => <option key={user.id} value={user.id}>{user.nombre}</option>)}</select></label>}
       <span className="topbar-status" title={error ? "Error de conexión con Supabase" : "Sesión activa"}>
         <span className={"status-dot " + (error ? "session-error-dot" : "status-dot-demo")} />
         <span className="session-name">{usuarioActual.nombre}</span>
       </span>
-      {rolAutenticado === "JEFE" && <label className="user-context-select"><select aria-label="Seleccionar usuario" title="Seleccionar usuario" value={usuarioEnContexto?.id ?? ""} onChange={(event) => cambiarContexto(event.target.value)}><option value="">{usuarioActual.nombre}</option>{usuarios.filter((user) => user.id !== usuarioActual.id).map((user) => <option key={user.id} value={user.id}>{user.nombre}</option>)}</select></label>}
+      </div>
+      <div className="sidebar-utility-row">
+        <ThemeToggle />
+        <TaskNotifications />
       <button className="button button-small session-signout" type="button" onClick={cerrarSesion} disabled={cerrando} aria-label={cerrando ? "Cerrando sesión" : "Cerrar sesión"} title={cerrando ? "Cerrando sesión" : "Cerrar sesión"}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4M8 12h10" /></svg>
       </button>
+      </div>
     </div>
   ) : <span className="topbar-status">Conectando sesión…</span>;
 }

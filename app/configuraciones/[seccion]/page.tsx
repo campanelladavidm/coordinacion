@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { CatalogManager } from "@/components/configuraciones/catalog-manager";
+import { ModelosEquipoManager } from "@/components/configuraciones/modelos-equipo-manager";
 import { PageHeading } from "@/components/ui/page-heading";
 import type { CatalogoKey } from "@/components/providers/demo-data-provider";
 
@@ -23,6 +24,13 @@ export default function CatalogoPage({ params }: { params: Promise<PageParams> }
 
 async function CatalogoContenido({ params }: { params: Promise<PageParams> }) {
   const { seccion } = await params;
+  if (seccion === "modelos-equipo") return (
+    <section className="settings-page">
+      <Link href="/configuraciones" className="back-link">← Volver a configuraciones</Link>
+      <PageHeading eyebrow="Configuración" title="Modelos de equipo" description="Registrá cada modelo con su precio unitario." />
+      <ModelosEquipoManager />
+    </section>
+  );
   const catalogo = catalogos[seccion as CatalogoKey];
   if (!catalogo) return <section className="settings-page"><Link href="/configuraciones" className="back-link">← Volver a configuraciones</Link><PageHeading eyebrow="Configuración" title="Catálogo no encontrado" description="Elegí un catálogo disponible en Configuraciones." /></section>;
 
