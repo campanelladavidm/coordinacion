@@ -9,6 +9,7 @@ type Concepto = {
   id: string; nombre: string; tipo: "SUMA" | "RESTA"; cantidad: number;
   precio: number; nota: string; enlace: string; formula?: FormulaVinculo;
 };
+type DescuentoEquipo = { id: string; modeloId: string; modelo: string; cantidad: number; precioUnitario: number };
 
 async function actor(request: NextRequest) {
   const session = await createSessionClient();
@@ -40,11 +41,31 @@ async function actor(request: NextRequest) {
 function jsonError(error: unknown) {
   const message = error instanceof Error ? error.message : "Ocurrió un error al guardar la liquidación.";
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  if (code === "42703" && message.includes("descuentos_equipos")) {
+    return NextResponse.json({ error: "Falta aplicar en Supabase la migración 202611100002_liquidaciones_descuentos_equipos.sql." }, { status: 503 });
+  }
   if (code === "42P01" || message.includes("public.liquidaciones") || message.includes("public.liquidaciones_exportaciones")) {
     return NextResponse.json({ error: "Falta aplicar en Supabase la migración 202610150005_liquidaciones.sql." }, { status: 503 });
   }
   const status = message.includes("Falta SUPABASE_SECRET_KEY") ? 503 : 500;
   return NextResponse.json({ error: message }, { status });
+}
+
+function validarDescuentosEquipos(value: unknown): { descuentos: DescuentoEquipo[] | null; error?: string } {
+  if (value === undefined) return { descuentos: [] };
+  if (!Array.isArray(value) || value.length > 100) return { descuentos: null, error: "La lista de descuentos de equipos no es válida." };
+  const descuentos: DescuentoEquipo[] = [];
+  for (const [index, item] of value.entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return { descuentos: null, error: `El descuento de equipo ${index + 1} no es válido.` };
+    const row = item as Record<string, unknown>;
+    const cantidad = Number(row.cantidad);
+    const precioUnitario = Number(row.precioUnitario);
+    if (typeof row.id !== "string" || !row.id || typeof row.modeloId !== "string" || !row.modeloId || typeof row.modelo !== "string" || !row.modelo.trim() || row.modelo.length > 120 || !Number.isInteger(cantidad) || cantidad < 1 || !Number.isFinite(precioUnitario) || precioUnitario < 0) {
+      return { descuentos: null, error: `Revisá el modelo, la cantidad y el precio del descuento ${index + 1}.` };
+    }
+    descuentos.push({ id: row.id, modeloId: row.modeloId, modelo: row.modelo.trim(), cantidad, precioUnitario });
+  }
+  return { descuentos };
 }
 
 function validarConceptos(value: unknown): { conceptos: Concepto[] | null; error?: string } {
@@ -104,7 +125,7 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient();
     const [tercerizadas, liquidaciones, exportacion] = await Promise.all([
       admin.from("tercerizadas").select("id,nombre,activo").order("orden").order("nombre"),
-      admin.from("liquidaciones").select("id,tercerizada_id,mes,anio,estado,conceptos,informacion_adicional,finalizado_por,finalizado_at,updated_at").eq("mes", mes).eq("anio", anio),
+      admin.from("liquidaciones").select("id,tercerizada_id,mes,anio,estado,conceptos,informacion_adicional,descuentos_equipos,finalizado_por,finalizado_at,updated_at").eq("mes", mes).eq("anio", anio),
       admin.from("liquidaciones_exportaciones").select("nombre_archivo,created_at").eq("mes", mes).eq("anio", anio).maybeSingle(),
     ]);
       if (tercerizadas.error) throw tercerizadas.error;
@@ -127,6 +148,9 @@ export async function POST(request: NextRequest) {
       const validacionConceptos = validarConceptos(body.conceptos);
       const conceptos = validacionConceptos.conceptos;
       if (!conceptos) return NextResponse.json({ error: validacionConceptos.error ?? "Revisá los datos de los conceptos." }, { status: 400 });
+      const validacionDescuentos = validarDescuentosEquipos(body.descuentosEquipos);
+      const descuentosEquipos = validacionDescuentos.descuentos;
+      if (!descuentosEquipos) return NextResponse.json({ error: validacionDescuentos.error ?? "Revisá los descuentos de equipos." }, { status: 400 });
       const informacionAdicional = typeof body.informacionAdicional === "string" ? body.informacionAdicional.trim().slice(0, 20000) : "";
       if (!periodoValido(mes, anio) || !tercerizadaId || !conceptos || (body.informacionAdicional !== undefined && typeof body.informacionAdicional !== "string")) return NextResponse.json({ error: "Revisá los datos de la liquidación." }, { status: 400 });
       const actual = await admin.from("liquidaciones").select("id,estado,creado_por").eq("tercerizada_id", tercerizadaId).eq("mes", mes).eq("anio", anio).maybeSingle();
@@ -136,7 +160,7 @@ export async function POST(request: NextRequest) {
       }
       const estado = actual.data?.estado ?? "BORRADOR";
       const saved = await admin.from("liquidaciones").upsert({
-        tercerizada_id: tercerizadaId, mes, anio, conceptos, informacion_adicional: informacionAdicional, estado,
+        tercerizada_id: tercerizadaId, mes, anio, conceptos, informacion_adicional: informacionAdicional, descuentos_equipos: descuentosEquipos, estado,
         creado_por: actual.data?.creado_por ?? auth.actor.usuarioId,
         ...(estado === "FINALIZADA" ? {} : { finalizado_por: null, finalizado_at: null }), updated_at: new Date().toISOString(),
       }, { onConflict: "tercerizada_id,mes,anio" }).select("id,estado,finalizado_at,updated_at").single();
@@ -148,11 +172,11 @@ export async function POST(request: NextRequest) {
       const tercerizadaId = typeof body.tercerizadaId === "string" ? body.tercerizadaId : "";
       const estado = body.estado;
       if (!periodoValido(mes, anio) || !tercerizadaId || (estado !== "BORRADOR" && estado !== "FINALIZADA")) return NextResponse.json({ error: "Estado o período inválido." }, { status: 400 });
-      const actual = await admin.from("liquidaciones").select("estado,conceptos,informacion_adicional,creado_por").eq("tercerizada_id", tercerizadaId).eq("mes", mes).eq("anio", anio).maybeSingle();
+      const actual = await admin.from("liquidaciones").select("estado,conceptos,informacion_adicional,descuentos_equipos,creado_por").eq("tercerizada_id", tercerizadaId).eq("mes", mes).eq("anio", anio).maybeSingle();
       if (actual.error) throw actual.error;
       if (actual.data?.estado === "FINALIZADA" && estado === "BORRADOR" && !["JEFE", "SUPERVISOR"].includes(auth.actor.rolAutenticado)) return NextResponse.json({ error: "Solo Jefe o Supervisor pueden reabrir una liquidación finalizada." }, { status: 403 });
       const changed = await admin.from("liquidaciones").upsert({
-        tercerizada_id: tercerizadaId, mes, anio, conceptos: actual.data?.conceptos ?? [], informacion_adicional: actual.data?.informacion_adicional ?? "", estado,
+        tercerizada_id: tercerizadaId, mes, anio, conceptos: actual.data?.conceptos ?? [], informacion_adicional: actual.data?.informacion_adicional ?? "", descuentos_equipos: actual.data?.descuentos_equipos ?? [], estado,
         creado_por: actual.data?.creado_por ?? auth.actor.usuarioId, finalizado_por: estado === "FINALIZADA" ? auth.actor.usuarioId : null,
         finalizado_at: estado === "FINALIZADA" ? new Date().toISOString() : null, updated_at: new Date().toISOString(),
       }, { onConflict: "tercerizada_id,mes,anio" }).select("id,estado,updated_at").single();

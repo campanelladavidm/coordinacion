@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider";
 import { DescuentosDialog } from "@/components/liquidaciones/descuentos-dialog";
+import { createClient } from "@/lib/supabase/client";
 
 type Estado = "BORRADOR" | "FINALIZADA";
 type FormulaVinculo = { conceptoId: string; modo: "FIJO" | "PORCENTAJE"; valor: number } | { conceptoId: string; adicional: number };
 type Concepto = { id: string; nombre: string; tipo: "SUMA" | "RESTA"; cantidad: number; precio: number; nota: string; enlace: string; formula?: FormulaVinculo };
 type Tercerizada = { id: string; nombre: string };
-type Liquidacion = { id: string; tercerizada_id: string; mes: number; anio: number; estado: Estado; conceptos: Concepto[]; informacion_adicional: string; finalizado_at: string | null };
+type ModeloEquipo = { id: string; modelo: string; precio_unitario: number; orden: number };
+type DescuentoEquipo = { id: string; modeloId: string; modelo: string; cantidad: number; precioUnitario: number };
+type Liquidacion = { id: string; tercerizada_id: string; mes: number; anio: number; estado: Estado; conceptos: Concepto[]; informacion_adicional: string; descuentos_equipos?: DescuentoEquipo[]; finalizado_at: string | null };
 type Exportacion = { nombre_archivo: string; created_at: string } | null;
 const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const clavePeriodoLiqui = "liqui:ultimo-periodo";
@@ -94,6 +97,9 @@ export function LiquidacionesView() {
   const [conceptoSobre, setConceptoSobre] = useState<string | null>(null);
   const conceptoArrastradoRef = useRef<string | null>(null);
   const [informacionAdicional, setInformacionAdicional] = useState("");
+  const [modelosEquipo, setModelosEquipo] = useState<ModeloEquipo[]>([]);
+  const [errorModelosEquipo, setErrorModelosEquipo] = useState("");
+  const [descuentosEquipos, setDescuentosEquipos] = useState<DescuentoEquipo[]>([]);
   const [descuentosOpen, setDescuentosOpen] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
@@ -115,6 +121,16 @@ export function LiquidacionesView() {
   const contextoId = usuarioEnContexto?.id;
   const puedeReabrir = rolAutenticado === "JEFE" || rolAutenticado === "SUPERVISOR";
 
+  useEffect(() => {
+    let activo = true;
+    void createClient().from("modelos_equipo").select("id,modelo,precio_unitario,orden").eq("activo", true).order("orden").order("modelo").then(({ data, error: errorCatalogo }) => {
+      if (!activo) return;
+      if (errorCatalogo) setErrorModelosEquipo("No se pudieron cargar los modelos de equipos. Verificá la configuración en Supabase.");
+      else { setModelosEquipo((data ?? []) as ModeloEquipo[]); setErrorModelosEquipo(""); }
+    });
+    return () => { activo = false; };
+  }, []);
+
   const cargar = useCallback(async (mantenerSeleccion = true) => {
     setCargando(true); setError("");
     try {
@@ -126,11 +142,13 @@ export function LiquidacionesView() {
       const actualId = mantenerSeleccion && data.tercerizadas.some((item) => item.id === seleccionActual) ? seleccionActual : data.tercerizadas[0]?.id ?? "";
       const loadedConcepts = data.liquidaciones.find((item) => item.tercerizada_id === actualId)?.conceptos ?? [];
       const loadedInformation = data.liquidaciones.find((item) => item.tercerizada_id === actualId)?.informacion_adicional ?? "";
+      const loadedDiscounts = data.liquidaciones.find((item) => item.tercerizada_id === actualId)?.descuentos_equipos ?? [];
       tercerizadaSeleccionada.current = actualId;
       setTercerizadaId(actualId);
       setConceptos(loadedConcepts);
       setInformacionAdicional(loadedInformation);
-      ultimoGuardado.current = JSON.stringify({ tercerizadaId: actualId, mes, anio, conceptos: loadedConcepts, informacionAdicional: loadedInformation });
+      setDescuentosEquipos(loadedDiscounts);
+      ultimoGuardado.current = JSON.stringify({ tercerizadaId: actualId, mes, anio, conceptos: loadedConcepts, informacionAdicional: loadedInformation, descuentosEquipos: loadedDiscounts });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudieron cargar las liquidaciones.");
     } finally { setCargando(false); }
@@ -170,19 +188,19 @@ export function LiquidacionesView() {
 
   useEffect(() => {
     if (!periodoListo || cargando || ocupado || soloLectura || !tercerizadaId) return;
-    const snapshot = JSON.stringify({ tercerizadaId, mes, anio, conceptos, informacionAdicional });
+    const snapshot = JSON.stringify({ tercerizadaId, mes, anio, conceptos, informacionAdicional, descuentosEquipos });
     if (snapshot === ultimoGuardado.current) return;
     const timeout = window.setTimeout(async () => {
       setMensaje("Guardando automáticamente…"); setError("");
       try {
         const result = await api<{ liquidacion: { id: string; estado: Estado; finalizado_at?: string | null } }>("/api/liquidaciones", {
-          method: "POST", body: JSON.stringify({ operacion: "guardar", tercerizadaId, mes, anio, conceptos, informacionAdicional }),
+          method: "POST", body: JSON.stringify({ operacion: "guardar", tercerizadaId, mes, anio, conceptos, informacionAdicional, descuentosEquipos }),
         }, contextoId);
         ultimoGuardado.current = snapshot;
         const saved = result.liquidacion;
         setLiquidaciones((current) => {
           const existing = current.some((item) => item.tercerizada_id === tercerizadaId);
-          const row: Liquidacion = { id: saved.id, tercerizada_id: tercerizadaId, mes, anio, estado: saved.estado, conceptos, informacion_adicional: informacionAdicional, finalizado_at: saved.finalizado_at ?? null };
+          const row: Liquidacion = { id: saved.id, tercerizada_id: tercerizadaId, mes, anio, estado: saved.estado, conceptos, informacion_adicional: informacionAdicional, descuentos_equipos: descuentosEquipos, finalizado_at: saved.finalizado_at ?? null };
           return existing ? current.map((item) => item.tercerizada_id === tercerizadaId ? row : item) : [...current, row];
         });
         setMensaje("Guardado automáticamente.");
@@ -192,7 +210,7 @@ export function LiquidacionesView() {
       }
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [conceptos, informacionAdicional, tercerizadaId, mes, anio, contextoId, periodoListo, cargando, ocupado, soloLectura]);
+  }, [conceptos, informacionAdicional, descuentosEquipos, tercerizadaId, mes, anio, contextoId, periodoListo, cargando, ocupado, soloLectura]);
 
   async function cambiarTercerizada(id: string) {
     if (id === tercerizadaId) return;
@@ -200,11 +218,13 @@ export function LiquidacionesView() {
     const nextLiquidacion = liquidaciones.find((item) => item.tercerizada_id === id);
     const nextConcepts = nextLiquidacion?.conceptos ?? [];
     const nextInformation = nextLiquidacion?.informacion_adicional ?? "";
-    ultimoGuardado.current = JSON.stringify({ tercerizadaId: id, mes, anio, conceptos: nextConcepts, informacionAdicional: nextInformation });
+    const nextDiscounts = nextLiquidacion?.descuentos_equipos ?? [];
+    ultimoGuardado.current = JSON.stringify({ tercerizadaId: id, mes, anio, conceptos: nextConcepts, informacionAdicional: nextInformation, descuentosEquipos: nextDiscounts });
     tercerizadaSeleccionada.current = id;
     setTercerizadaId(id);
     setConceptos(nextConcepts);
     setInformacionAdicional(nextInformation);
+    setDescuentosEquipos(nextDiscounts);
     setMensaje(""); setError("");
   }
 
@@ -257,18 +277,18 @@ export function LiquidacionesView() {
     });
   }
 
-  async function guardar(actualConceptos = conceptos, destinoId = tercerizadaId, destinoMes = mes, destinoAnio = anio, actualInformacion = informacionAdicional) {
+  async function guardar(actualConceptos = conceptos, destinoId = tercerizadaId, destinoMes = mes, destinoAnio = anio, actualInformacion = informacionAdicional, actualDescuentos = descuentosEquipos) {
     if (!destinoId) return true;
-    const snapshot = JSON.stringify({ tercerizadaId: destinoId, mes: destinoMes, anio: destinoAnio, conceptos: actualConceptos, informacionAdicional: actualInformacion });
+    const snapshot = JSON.stringify({ tercerizadaId: destinoId, mes: destinoMes, anio: destinoAnio, conceptos: actualConceptos, informacionAdicional: actualInformacion, descuentosEquipos: actualDescuentos });
     if (snapshot === ultimoGuardado.current) return true;
     setOcupado(true); setError(""); setMensaje("Guardando automáticamente…");
     try {
-      const result = await api<{ liquidacion: { id: string; estado: Estado; finalizado_at?: string | null } }>("/api/liquidaciones", { method: "POST", body: JSON.stringify({ operacion: "guardar", tercerizadaId: destinoId, mes: destinoMes, anio: destinoAnio, conceptos: actualConceptos, informacionAdicional: actualInformacion }) }, contextoId);
+      const result = await api<{ liquidacion: { id: string; estado: Estado; finalizado_at?: string | null } }>("/api/liquidaciones", { method: "POST", body: JSON.stringify({ operacion: "guardar", tercerizadaId: destinoId, mes: destinoMes, anio: destinoAnio, conceptos: actualConceptos, informacionAdicional: actualInformacion, descuentosEquipos: actualDescuentos }) }, contextoId);
       ultimoGuardado.current = snapshot;
       const saved = result.liquidacion;
       setLiquidaciones((current) => {
         const existing = current.some((item) => item.tercerizada_id === destinoId);
-        const row: Liquidacion = { id: saved.id, tercerizada_id: destinoId, mes: destinoMes, anio: destinoAnio, estado: saved.estado, conceptos: actualConceptos, informacion_adicional: actualInformacion, finalizado_at: saved.finalizado_at ?? null };
+        const row: Liquidacion = { id: saved.id, tercerizada_id: destinoId, mes: destinoMes, anio: destinoAnio, estado: saved.estado, conceptos: actualConceptos, informacion_adicional: actualInformacion, descuentos_equipos: actualDescuentos, finalizado_at: saved.finalizado_at ?? null };
         return existing ? current.map((item) => item.tercerizada_id === destinoId ? row : item) : [...current, row];
       });
       setMensaje("Guardado automáticamente.");
@@ -291,6 +311,18 @@ export function LiquidacionesView() {
 
   function agregarConcepto() {
     setConceptos((actual) => [...actual, { id: nuevoId(), nombre: "", tipo: "SUMA", cantidad: 0, precio: 0, nota: "", enlace: "" }]);
+  }
+
+  function agregarDescuentoEquipo() {
+    const modelo = modelosEquipo[0];
+    if (!modelo) return;
+    setDescuentosEquipos((actual) => [...actual, { id: nuevoId(), modeloId: modelo.id, modelo: modelo.modelo, cantidad: 1, precioUnitario: Number(modelo.precio_unitario) || 0 }]);
+  }
+
+  function actualizarDescuentoEquipo(id: string, modeloId: string, cantidad: number) {
+    const modelo = modelosEquipo.find((item) => item.id === modeloId);
+    if (!modelo) return;
+    setDescuentosEquipos((actual) => actual.map((item) => item.id === id ? { ...item, modeloId: modelo.id, modelo: modelo.modelo, precioUnitario: Number(modelo.precio_unitario) || 0, cantidad } : item));
   }
 
   function aplicarAumento() {
@@ -401,7 +433,10 @@ export function LiquidacionesView() {
   const empresaPdf = imprimiendo ? tercerizadas.find((item) => item.id === imprimiendo) : undefined;
   const conceptosPdf = imprimiendo === tercerizadaId ? conceptos : liquidacionPdf?.conceptos ?? [];
   const informacionPdf = imprimiendo === tercerizadaId ? informacionAdicional : liquidacionPdf?.informacion_adicional ?? "";
+  const descuentosEquipoPdf = imprimiendo === tercerizadaId ? descuentosEquipos : liquidacionPdf?.descuentos_equipos ?? [];
+  const totalDescuentosEquipos = descuentosEquipos.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
   const totalPdf = conceptosPdf.reduce((acc, item) => acc + (item.tipo === "RESTA" ? -1 : 1) * item.cantidad * item.precio, 0);
+  const totalDescuentosPdf = descuentosEquipoPdf.reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
 
   return (
     <section className="liqui-page">
@@ -449,6 +484,18 @@ export function LiquidacionesView() {
               <textarea id="liqui-informacion-adicional" value={informacionAdicional} maxLength={20000} rows={6} onChange={(event) => setInformacionAdicional(event.target.value)} placeholder="Agregá acá información adicional necesaria para esta liquidación…" disabled={soloLectura} style={{ display: "block", boxSizing: "border-box", width: "100%", minHeight: 150, resize: "vertical", border: "1px solid var(--border)", borderRadius: 7, outline: 0, background: "var(--background)", padding: "10px 11px", color: "var(--text)", font: "inherit", fontSize: 13, lineHeight: 1.5 }} />
               <small style={{ color: "var(--muted)", fontSize: 11 }}>{soloLectura ? "Liquidación finalizada." : "Se guarda automáticamente mientras escribís."}</small>
             </section>
+            <section className="panel liqui-equipment-discounts">
+              <div className="liqui-section-head"><div><h3>Descuentos equipos</h3><span>Descontá equipos por modelo y cantidad.</span></div><button className="button" type="button" onClick={agregarDescuentoEquipo} disabled={soloLectura || !modelosEquipo.length}>+ Agregar equipo</button></div>
+              {errorModelosEquipo ? <p className="liqui-error">{errorModelosEquipo}</p> : !modelosEquipo.length ? <p className="liqui-muted">No hay modelos activos. Cargalos desde Configuraciones · Modelos de equipos.</p> : null}
+              {descuentosEquipos.map((item) => <div className="liqui-equipment-discount-row" key={item.id}>
+                <select aria-label="Modelo de equipo" value={item.modeloId} onChange={(event) => actualizarDescuentoEquipo(item.id, event.target.value, item.cantidad)} disabled={soloLectura}><option value="" disabled>Elegí un modelo</option>{modelosEquipo.map((modelo) => <option key={modelo.id} value={modelo.id}>{modelo.modelo}</option>)}</select>
+                <input aria-label="Cantidad de equipos" type="number" min="1" step="1" value={item.cantidad} onChange={(event) => setDescuentosEquipos((actual) => actual.map((row) => row.id === item.id ? { ...row, cantidad: Math.max(1, Math.floor(Number(event.target.value) || 1)) } : row))} disabled={soloLectura} />
+                <span className="liqui-equipment-unit-price">{formatoMoneda.format(item.precioUnitario)} c/u</span>
+                <strong>− {formatoMoneda.format(item.cantidad * item.precioUnitario)}</strong>
+                <button className="liqui-delete" type="button" aria-label={`Quitar ${item.modelo}`} onClick={() => setDescuentosEquipos((actual) => actual.filter((row) => row.id !== item.id))} disabled={soloLectura}>×</button>
+              </div>)}
+              <div className="liqui-equipment-discount-total"><span>Total descuentos por equipos</span><strong>− {formatoMoneda.format(totalDescuentosEquipos)}</strong></div>
+            </section>
           </>}
           <div className="liqui-feedback" aria-live="polite">{error && <p className="liqui-error">{error}</p>}{mensaje && !mensaje.startsWith("Guardado automáticamente") && !mensaje.startsWith("Guardando automáticamente") && <p className="liqui-success">{mensaje}</p>}</div>
         </main>
@@ -477,7 +524,16 @@ export function LiquidacionesView() {
           </tr>)}</tbody>
         </table></div>
         {informacionPdf && <section className="liqui-print-extra"><h2>Información adicional</h2><p>{informacionPdf}</p></section>}
-        <footer className="liqui-print-total"><span>Total</span><strong>{formatoMoneda.format(totalPdf)}</strong></footer>
+        <footer className="liqui-print-total"><span>Total liquidación</span><strong>{formatoMoneda.format(totalPdf)}</strong></footer>
+        <section className="liqui-print-equipment-discounts">
+          <h2>Descuentos de equipos</h2>
+          {descuentosEquipoPdf.length ? <div className="liqui-print-table-wrap"><table>
+            <thead><tr><th>Modelo</th><th>Cantidad</th><th>Precio unitario</th><th>Descuento</th></tr></thead>
+            <tbody>{descuentosEquipoPdf.map((item) => <tr key={item.id}><td>{item.modelo}</td><td>{numero(item.cantidad)}</td><td>{formatoMoneda.format(item.precioUnitario)}</td><td className="liqui-print-deduction">− {formatoMoneda.format(item.cantidad * item.precioUnitario)}</td></tr>)}</tbody>
+          </table></div> : <p>Sin descuentos de equipos en esta liquidación.</p>}
+          <div className="liqui-print-discount-total"><span>Total descuentos</span><strong>− {formatoMoneda.format(totalDescuentosPdf)}</strong></div>
+        </section>
+        <footer className="liqui-print-total liqui-print-final-total"><span>Total final</span><strong>{formatoMoneda.format(totalPdf - totalDescuentosPdf)}</strong></footer>
       </article>}
     </section>
   );
