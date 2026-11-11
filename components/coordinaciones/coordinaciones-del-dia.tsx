@@ -189,7 +189,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
   const [guardandoOrden, setGuardandoOrden] = useState(false);
   const delDia = coordinaciones.filter((coordinacion) => coordinacion.fecha === fecha);
   const idsSeleccionados = seleccionMasiva.fecha === fecha ? seleccionMasiva.ids : [];
-  const casosSeleccionados = delDia.filter((coordinacion) => idsSeleccionados.includes(coordinacion.id) && coordinacion.cuadrillaId === null);
+  const casosSeleccionados = delDia.filter((coordinacion) => idsSeleccionados.includes(coordinacion.id));
   const cuadrillasActivas = catalogos.cuadrillas.filter((cuadrilla) => cuadrilla.activo !== false);
   const termino = normalizarBusqueda(busqueda.trim());
   const coordinacionesFiltradas = delDia.filter((coordinacion) => {
@@ -285,7 +285,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
 
   async function asignarSeleccionMasiva() {
     if (casosSeleccionados.length === 0) {
-      setErrorAsignacion("Seleccioná al menos un caso sin cuadrilla.");
+      setErrorAsignacion("Seleccioná al menos un caso.");
       return;
     }
     if (!cuadrillaDestinoId) {
@@ -305,9 +305,9 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
       const cantidad = casosSeleccionados.length;
       await asignarCoordinaciones(casosSeleccionados.map((caso) => caso.id), cuadrillaDestino.id);
       limpiarSeleccionMasiva();
-      setAvisoAsignacion(`${cantidad} ${cantidad === 1 ? "caso asignado" : "casos asignados"} a ${cuadrillaDestino.nombre}.`);
+      setAvisoAsignacion(`${cantidad} ${cantidad === 1 ? "caso movido" : "casos movidos"} a ${cuadrillaDestino.nombre}.`);
     } catch (cause) {
-      setErrorAsignacion(cause instanceof Error ? cause.message : "No se pudieron asignar los casos.");
+      setErrorAsignacion(cause instanceof Error ? cause.message : "No se pudieron mover los casos.");
     } finally {
       setGuardandoAsignacion(false);
     }
@@ -408,10 +408,9 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
     const cuadrillasDeTercerizada = grupos.get(tercerizadaId)!;
     if (!cuadrillasDeTercerizada.has(cuadrilla.id)) cuadrillasDeTercerizada.set(cuadrilla.id, []);
   }
-  const tercerizadaDelPrimerGrupoSinCuadrilla = [...grupos.entries()].find(([, cuadrillas]) => cuadrillas.has("sin-cuadrilla"))?.[0];
   const barraAsignacionMasiva = casosSeleccionados.length > 0 ? <div className="bulk-assignment-toolbar">
     <strong className="bulk-assignment-count">{casosSeleccionados.length} {casosSeleccionados.length === 1 ? "caso seleccionado" : "casos seleccionados"}</strong>
-    <label className="bulk-assignment-select">Asignar a:
+    <label className="bulk-assignment-select">Mover a:
       <select value={cuadrillaDestinoId} onChange={(event) => { setCuadrillaDestinoId(event.target.value); setErrorAsignacion(""); }} disabled={guardandoAsignacion}>
         <option value="">Elegí una cuadrilla</option>
         {cuadrillasActivas.map((cuadrilla) => <option key={cuadrilla.id} value={cuadrilla.id}>
@@ -419,7 +418,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
         </option>)}
       </select>
     </label>
-    <button className="button button-primary bulk-assignment-submit" type="button" disabled={guardandoAsignacion || !cuadrillaDestinoId} onClick={() => void asignarSeleccionMasiva()}>{guardandoAsignacion ? "Asignando…" : "Asignar casos"}</button>
+    <button className="button button-primary bulk-assignment-submit" type="button" disabled={guardandoAsignacion || !cuadrillaDestinoId} onClick={() => void asignarSeleccionMasiva()}>{guardandoAsignacion ? "Moviendo…" : "Mover casos"}</button>
     <button className="button bulk-assignment-clear" type="button" disabled={guardandoAsignacion} onClick={limpiarSeleccionMasiva}>Limpiar selección</button>
     <button className="button bulk-assignment-copy" type="button" disabled={guardandoAsignacion} onClick={() => void copiarTicketsSeleccionados()}>{seleccionCopiada ? "¡Copiados!" : "Copiar seleccionados"}</button>
   </div> : null;
@@ -430,7 +429,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
         <button className="custody-delete-button coordination-delete-button" type="button" disabled={eliminandoCoordinacion === coordinacion.id} title="Eliminar coordinación" aria-label={`Eliminar coordinación ${coordinacion.ticket}`} onClick={() => void eliminarCaso(coordinacion)}>
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3.5h6M4.5 5.5h11m-9.5 0 .65 11h6.7l.65-11M8 8.5v5m4-5v5" /></svg>
         </button>
-        <div role={coordinacion.cuadrillaId === null ? "group" : "button"} tabIndex={0} className={`coordination-summary${coordinacion.cuadrillaId === null ? " coordination-summary-selectable" : ""}${casosSeleccionados.some((caso) => caso.id === coordinacion.id) ? " coordination-summary-selected" : ""}`} aria-label={coordinacion.cuadrillaId === null ? `Coordinación ${coordinacion.ticket}; seleccioná la casilla para asignar a una cuadrilla` : undefined} aria-expanded={coordinacion.cuadrillaId === null ? undefined : abierta === coordinacion.id} onKeyDown={(event) => {
+        <div role="group" tabIndex={0} className={`coordination-summary coordination-summary-selectable${casosSeleccionados.some((caso) => caso.id === coordinacion.id) ? " coordination-summary-selected" : ""}`} aria-label={`Coordinación ${coordinacion.ticket}; usá la casilla para moverla a otra cuadrilla`} aria-expanded={abierta === coordinacion.id} onKeyDown={(event) => {
           if ((event.target as HTMLElement).closest("input[type='checkbox']")) return;
           if (event.key !== "Enter" && event.key !== " ") return;
           event.preventDefault();
@@ -455,7 +454,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
             });
           }
         }}>
-          <span className="coordination-ticket-cell"><span className="coordination-drag-handle" draggable={!termino && !guardandoOrden} title="Arrastrá para reordenar" aria-label="Arrastrar para reordenar">⠿</span><span className="coordination-ticket" title="Seleccioná el número para copiarlo">{coordinacion.ticket}</span>{coordinacion.cuadrillaId === null && <input className="coordination-select-checkbox" type="checkbox" checked={casosSeleccionados.some((caso) => caso.id === coordinacion.id)} disabled={guardandoAsignacion} aria-label={`Seleccionar caso ${coordinacion.ticket} para asignarlo a una cuadrilla`} onClick={(event) => event.stopPropagation()} onChange={(event) => cambiarSeleccionMasiva(coordinacion.id, event.target.checked)} />}</span>
+          <span className="coordination-ticket-cell"><span className="coordination-drag-handle" draggable={!termino && !guardandoOrden} title="Arrastrá para reordenar" aria-label="Arrastrar para reordenar">⠿</span><span className="coordination-ticket" title="Seleccioná el número para copiarlo">{coordinacion.ticket}</span><input className="coordination-select-checkbox" type="checkbox" checked={casosSeleccionados.some((caso) => caso.id === coordinacion.id)} disabled={guardandoAsignacion} aria-label={`Seleccionar caso ${coordinacion.ticket} para moverlo a otra cuadrilla`} onClick={(event) => event.stopPropagation()} onChange={(event) => cambiarSeleccionMasiva(coordinacion.id, event.target.checked)} /></span>
           <span className="coordination-meta"><span>{nombreDe(catalogos.tecnologias, coordinacion.tecnologiaId)}</span><span>{coordinacion.zona ? nombreDe(catalogos.zonas, coordinacion.zona) : "Zona sin asignar"}</span><span>{nombreDe(catalogos.categorias, coordinacion.categoriaId)}</span></span>
           <span className={"state-badge state-" + normalizarBusqueda(nombreDe(catalogos.estados, coordinacion.estadoId)).replace(/\s+/g, "-")} title="Doble clic para marcar como confirmado">{nombreDe(catalogos.estados, coordinacion.estadoId)}</span>
           <span className="expand-chevron">{abierta === coordinacion.id ? "⌃" : "⌄"}</span>
@@ -495,7 +494,7 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
       {errorOrden && <p className="text-sm text-rose-300" role="alert">{errorOrden}</p>}
       {errorAsignacion && <p className="bulk-assignment-message bulk-assignment-error" role="alert">{errorAsignacion}</p>}
       {avisoAsignacion && <p className="bulk-assignment-message bulk-assignment-success" role="status">{avisoAsignacion}</p>}
-      {casosSeleccionados.length > 0 && tercerizadaDelPrimerGrupoSinCuadrilla === undefined && barraAsignacionMasiva}
+      {barraAsignacionMasiva}
       {!ready ? <EmptyState title="Cargando coordinaciones" description="Un momento, estamos preparando los datos de demostración." /> : coordinacionesFiltradas.length === 0 && delDia.length > 0 ? <EmptyState title="No encontramos coincidencias" description="Probá con otro ticket, cliente, cuadrilla u otro dato de la coordinación." /> : delDia.length === 0 && rangosPlanificadosDelDia.length === 0 ? <EmptyState title="No hay coordinaciones para este día" description="Podés cargar una coordinación nueva con el botón de arriba." icon="＋" onIconClick={() => setMostrarNuevaCoordinacion(true)} iconActionLabel="Cargar coordinación nueva" /> : (
         <div className="daily-groups">
           {[...grupos.entries()].map(([tercerizadaId, cuadrillasDeTercerizada]) => (
@@ -548,7 +547,6 @@ export function CoordinacionesDelDia({ fecha, tituloFecha }: { fecha: string; ti
                       {items.length > 0 && <span className="crew-count">{items.length}</span>}
                     </span>
                   </h4>
-                  {casosSeleccionados.length > 0 && cuadrillaId === "sin-cuadrilla" && tercerizadaId === tercerizadaDelPrimerGrupoSinCuadrilla && barraAsignacionMasiva}
                   {cuadrillaId === "sin-cuadrilla" ? <div className="unassigned-zone-groups">
                     {zonasSinCuadrilla.map(([zonaId, itemsZona]) => <section key={zonaId} className="unassigned-zone-group">
                       <h5 className="unassigned-zone-heading"><span>{zonaId === "sin-zona" ? "Zona sin asignar" : nombreDe(catalogos.zonas, zonaId)}</span><span>{itemsZona.length}</span></h5>

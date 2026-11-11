@@ -301,7 +301,12 @@ html[data-theme="light"] .notice-recipient-menu button.is-selected { background:
 .expand-chevron { grid-column: 4; grid-row: 1; justify-self: center; }
 .coordination-summary:hover .coordination-ticket { color: #83c2ff; }
 .coordination-ticket-cell { display: inline-flex; min-width: 0; align-items: center; gap: 8px; }
-.coordination-select-checkbox { width: 15px; height: 15px; flex: 0 0 15px; margin: 0 0 0 5px; accent-color: #2988d3; cursor: pointer; }
+.coordination-select-checkbox { appearance: none; position: relative; display: inline-grid; width: 14px; height: 14px; flex: 0 0 14px; place-items: center; margin: 0 0 0 5px; border: 1px solid #42617d; border-radius: 4px; background: #0b1928; cursor: pointer; transition: border-color .14s ease, background-color .14s ease, box-shadow .14s ease; }
+.coordination-select-checkbox::after { width: 6px; height: 3px; border-bottom: 1.5px solid #c7e6ff; border-left: 1.5px solid #c7e6ff; content: ""; opacity: 0; transform: translateY(-1px) rotate(-45deg) scale(.8); transition: opacity .12s ease, transform .12s ease; }
+.coordination-select-checkbox:checked { border-color: #4b91c4; background: #18344e; }
+.coordination-select-checkbox:checked::after { opacity: 1; transform: translateY(-1px) rotate(-45deg) scale(1); }
+.coordination-select-checkbox:hover { border-color: #6fa9d2; }
+.coordination-select-checkbox:focus-visible { outline: 2px solid rgb(86 167 255 / 50%); outline-offset: 2px; }
 .coordination-select-checkbox:disabled { cursor: wait; opacity: .65; }
 .coordination-summary-selectable { cursor: pointer; }
 .coordination-summary-selectable:focus-visible { outline: 2px solid #458fd4; outline-offset: 2px; }
@@ -580,8 +585,10 @@ html[data-theme="light"] .coordination-item { border-color: #e0e7ee; }
 html[data-theme="light"] .coordination-summary:hover { background: #f1f6fa; }
 html[data-theme="light"] .coordination-summary-selected { background: #e8f3fb; }
 html[data-theme="light"] .coordination-summary-selectable.coordination-summary-selected:hover { background: #e8f3fb; }
+html[data-theme="light"] .coordination-select-checkbox { border-color: #a9bfce; background: #f9fcfe; }
+html[data-theme="light"] .coordination-select-checkbox:checked { border-color: #4386b5; background: #3d83b5; }
+html[data-theme="light"] .coordination-select-checkbox::after { border-color: #fff; }
 html[data-theme="light"] .coordination-ticket { color: #263c52; }
-html[data-theme="light"] .coordination-select-checkbox { accent-color: #2876b2; }
 html[data-theme="light"] .coordination-meta { color: #5d7186; }
 html[data-theme="light"] .coordination-drag-handle, html[data-theme="light"] .expand-chevron { color: #688198; }
 html[data-theme="light"] .coordination-detail { border-color: #dce5ec; background: #f6f9fb; }

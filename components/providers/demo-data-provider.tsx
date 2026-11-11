@@ -335,17 +335,15 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
   }, [catalogos.cuadrillas, coordinaciones]);
 
   const asignarCoordinaciones = useCallback(async (ids: string[], cuadrillaId: string) => {
-    if (ids.length === 0) throw new Error("Seleccioná al menos un caso sin cuadrilla.");
+    if (ids.length === 0) throw new Error("Seleccioná al menos un caso.");
     const cuadrilla = catalogos.cuadrillas.find((item) => item.id === cuadrillaId && item.activo !== false);
     if (!cuadrilla) throw new Error("La cuadrilla elegida ya no está disponible.");
 
     const seleccionadas = ids.map((id) => coordinaciones.find((item) => item.id === id));
-    if (seleccionadas.some((item) => !item || item.cuadrillaId !== null)) {
-      throw new Error("Alguno de los casos ya fue asignado. Actualizá la página y volvé a seleccionar.");
-    }
+    if (seleccionadas.some((item) => !item)) throw new Error("No se encontraron todos los casos seleccionados. Actualizá la página y volvé a seleccionar.");
     const fecha = seleccionadas[0]?.fecha;
     if (!fecha || seleccionadas.some((item) => item?.fecha !== fecha)) {
-      throw new Error("Seleccioná casos del mismo día para asignarlos juntos.");
+      throw new Error("Seleccioná casos del mismo día para moverlos juntos.");
     }
 
     const supabase = createClient();
