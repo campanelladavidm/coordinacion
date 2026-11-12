@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { wikiContentLength, wikiPlainText, WIKI_RICH_PREFIX } from "@/components/wiki/wiki-content";
 
 const ROLES = ["COORDINADOR", "SUPERVISOR", "JEFE", "SOPORTE"];
 const SECTORES = ["Coordinación", "Soporte", "Supervisión", "Jefatura"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_RICH_CONTENT_CHARS = 200_000;
+
+function validContent(value: string) {
+  const content = value.trim();
+  if (!content) return false;
+  if (content.startsWith(WIKI_RICH_PREFIX)) {
+    if (content.length > MAX_RICH_CONTENT_CHARS) return false;
+    try {
+      const document = JSON.parse(content.slice(WIKI_RICH_PREFIX.length)) as { type?: string };
+      return document?.type === "doc" && wikiContentLength(content) <= 12000 && Boolean(wikiPlainText(content).trim());
+    } catch {
+      return false;
+    }
+  }
+  return content.length <= 12000;
+}
 
 async function actor(request?: NextRequest) {
   const session = await createClient();
@@ -87,7 +104,7 @@ export async function POST(request: NextRequest) {
     const contenido = String(form.get("contenido") ?? "").trim();
     if (!titulo || titulo.length > 120) return NextResponse.json({ error: "Ingresá un título de hasta 120 caracteres." }, { status: 400 });
     if (!SECTORES.includes(area)) return NextResponse.json({ error: "Seleccioná un sector válido." }, { status: 400 });
-    if (!contenido || contenido.length > 12000) return NextResponse.json({ error: "El contenido es obligatorio y admite hasta 12.000 caracteres." }, { status: 400 });
+    if (!validContent(contenido)) return NextResponse.json({ error: "El contenido es obligatorio y admite hasta 12.000 caracteres." }, { status: 400 });
     const admin = createAdminClient();
     const imagenUrl = await saveImage(admin, form.get("imagen"));
     const { data, error } = await admin.from("notas_equipo").insert({ titulo, area_interesada: area, comentario: contenido, imagen_url: imagenUrl, creado_por: auth.userId }).select("id").single();
@@ -107,7 +124,7 @@ export async function PATCH(request: NextRequest) {
     const area = String(form.get("area") ?? "").trim();
     const contenido = String(form.get("contenido") ?? "").trim();
     if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: "La publicación no es válida." }, { status: 400 });
-    if (!titulo || titulo.length > 120 || !SECTORES.includes(area) || !contenido || contenido.length > 12000) return NextResponse.json({ error: "Completá título, sector y contenido dentro de los límites indicados." }, { status: 400 });
+    if (!titulo || titulo.length > 120 || !SECTORES.includes(area) || !validContent(contenido)) return NextResponse.json({ error: "Completá título, sector y contenido dentro de los límites indicados." }, { status: 400 });
     const admin = createAdminClient();
     const { data: current, error: readError } = await admin.from("notas_equipo").select("id,creado_por,imagen_url").eq("id", id).maybeSingle();
     if (readError) throw readError;

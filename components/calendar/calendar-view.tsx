@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -10,6 +10,7 @@ import esLocale from "@fullcalendar/core/locales/es";
 import type { DayCellContentArg, DayCellMountArg } from "@fullcalendar/core";
 import { useCoordinacionesDemo } from "@/components/providers/demo-data-provider";
 import { ZoneActivityMap } from "@/components/calendar/zone-activity-map";
+import { ProductosCuadrillasModal } from "@/components/calendar/productos-cuadrillas-modal";
 
 type UsuarioAviso = { id: string; nombre: string };
 type Aviso = { id: string; texto: string; desde: string; hasta: string; creado_por: string; creadorNombre: string };
@@ -59,6 +60,7 @@ export function CalendarView() {
   const [cerrando, setCerrando] = useState<string | null>(null);
   const [indiceAviso, setIndiceAviso] = useState(0);
   const [radarAbierto, setRadarAbierto] = useState(false);
+  const [productosCuadrillasAbierto, setProductosCuadrillasAbierto] = useState(false);
   const [radarCargando, setRadarCargando] = useState(false);
   const [radarError, setRadarError] = useState("");
   const [radarFilas, setRadarFilas] = useState<FilaRadar[]>([]);
@@ -236,7 +238,7 @@ export function CalendarView() {
         <div className="calendar-mobile-view">
           <div className="calendar-mobile-heading"><h2>{tituloMesMovil}</h2></div>
           <div className="calendar-mobile-controls">
-            <div className="calendar-mobile-month-nav"><button type="button" aria-label="Mes anterior" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Mes siguiente" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() + 1, 1))}>›</button><button type="button" onClick={() => setMesMovil(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Hoy</button><button type="button" className="calendar-mobile-radar" onClick={() => void abrirRadar()}>Radar semanal</button><button type="button" className="calendar-mobile-new-notice" onClick={abrirFormulario}>Nuevo aviso</button></div>
+            <div className="calendar-mobile-month-nav"><button type="button" aria-label="Mes anterior" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() - 1, 1))}>‹</button><button type="button" aria-label="Mes siguiente" onClick={() => setMesMovil(new Date(mesMovil.getFullYear(), mesMovil.getMonth() + 1, 1))}>›</button><button type="button" onClick={() => setMesMovil(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Hoy</button><button type="button" className="calendar-mobile-radar" onClick={() => void abrirRadar()}>Radar semanal</button><button type="button" className="calendar-mobile-products" onClick={() => setProductosCuadrillasAbierto(true)}>Productos y cuadrillas</button><button type="button" className="calendar-mobile-new-notice" onClick={abrirFormulario}>Nuevo aviso</button></div>
           </div><div className="calendar-mobile-grid" role="grid" aria-label={`Calendario de ${tituloMesMovil}`}>
             {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((dia) => <div key={dia} className="calendar-mobile-weekday" role="columnheader">{dia}</div>)}
             {diasMovil.map((dia) => {
@@ -249,7 +251,7 @@ export function CalendarView() {
             })}
           </div>
         </div>
-        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="parent" expandRows headerToolbar={{ left: "prev,next today radarSemanal", center: "title", right: "nuevoAviso" }} titleFormat={(arg) => tituloDelMes(new Date(arg.date.year, arg.date.month, 1))} customButtons={{ nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario }, radarSemanal: { text: "Radar semanal", click: () => void abrirRadar() } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={soloCalendario ? undefined : (info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
+        <div className="calendar-desktop-view"><FullCalendar plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={esLocale} firstDay={1} height="parent" expandRows headerToolbar={{ left: "prev,next today radarSemanal", center: "title", right: "productosCuadrillas nuevoAviso" }} titleFormat={(arg) => tituloDelMes(new Date(arg.date.year, arg.date.month, 1))} customButtons={{ productosCuadrillas: { text: "Productos y cuadrillas", click: () => setProductosCuadrillasAbierto(true) }, nuevoAviso: { text: "Nuevo aviso", click: abrirFormulario }, radarSemanal: { text: "Radar semanal", click: () => void abrirRadar() } }} buttonText={{ today: "Hoy" }} dayCellContent={renderDayCell} dayCellClassNames={classesForDay} dayCellDidMount={contenidoAdicionalDeDia} dateClick={soloCalendario ? undefined : (info) => router.push("/coordinaciones/" + info.dateStr)} fixedWeekCount={false} /></div>
       </div>
       <div className="calendar-footer">
         <div className="calendar-note">{error ? `Error de conexión: ${error}` : ready ? "Datos guardados en Supabase." : "Cargando calendario…"}</div>
@@ -260,6 +262,8 @@ export function CalendarView() {
           <span><i className="calendar-legend-dot calendar-legend-today" />Hoy</span>
         </div>
       </div>
+
+      <ProductosCuadrillasModal open={productosCuadrillasAbierto} onClose={() => setProductosCuadrillasAbierto(false)} contextUserId={usuarioEnContexto?.id}/>
 
       {radarAbierto && <div className="radar-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRadarAbierto(false); }}><section className="radar-modal" role="dialog" aria-modal="true" aria-labelledby="radar-title"><header className="radar-heading"><div><p className="eyebrow">PLANIFICACIÓN SEMANAL</p><h2 id="radar-title">Radar semanal</h2><p className="radar-subtitle">Semana actual · {radarInicio ? etiquetaSemana(radarInicio) : ""}</p></div><button type="button" className="radar-close" aria-label="Cerrar radar" onClick={() => setRadarAbierto(false)}>×</button></header>
         {radarCargando ? <div className="radar-message" role="status">Actualizando datos de esta semana…</div> : radarError ? <div className="radar-message radar-error" role="alert">No se pudo cargar el radar. {radarError}</div> : <>

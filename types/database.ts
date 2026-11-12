@@ -14,7 +14,7 @@ export type Database = {
       roles: Table<{ id: string; codigo: "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE"; nombre: string; created_at: string }, { id?: string; codigo: "COORDINADOR" | "SUPERVISOR" | "JEFE" | "SOPORTE"; nombre: string }>;
       usuarios: Table<{ id: string; nombre_completo: string | null; rol_id: string; activo: boolean; created_at: string; updated_at: string }, { id: string; nombre_completo?: string | null; rol_id: string; activo?: boolean }>;
       tercerizadas: Table<CatalogRow, CatalogInsert>;
-      cuadrillas: Table<CatalogRow & { tercerizada_id: string | null; zona_id: string | null }, CatalogInsert & { tercerizada_id?: string | null; zona_id?: string | null }>;
+      cuadrillas: Table<CatalogRow & { tercerizada_id: string | null; zona_id: string | null; producto_fibra: boolean; producto_wireless: boolean; producto_fibra_iptv: boolean; producto_wireless_iptv: boolean; producto_insitu: boolean; producto_gamer: boolean; producto_home_max: boolean }, CatalogInsert & { tercerizada_id?: string | null; zona_id?: string | null; producto_fibra?: boolean; producto_wireless?: boolean; producto_fibra_iptv?: boolean; producto_wireless_iptv?: boolean; producto_insitu?: boolean; producto_gamer?: boolean; producto_home_max?: boolean }>;
       tecnologias: Table<CatalogRow, CatalogInsert>;
       categorias: Table<CatalogRow, CatalogInsert>;
       horarios: Table<CatalogRow, CatalogInsert>;
