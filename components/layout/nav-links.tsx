@@ -81,11 +81,15 @@ export function NavLinks() {
             : link.href === "/liqui"
               ? pathname.startsWith("/liqui")
             : pathname.startsWith(link.href);
+        const dashboardActive = link.href === "/paneles" && isActive;
         return (
-          <Link key={link.href} className={`nav-link${isActive ? " active" : ""}`} href={href} aria-current={isActive ? "page" : undefined} title={link.label}>
+          <div key={link.href} className="nav-link-group">
+          <Link className={`nav-link${isActive ? " active" : ""}`} href={href} aria-current={isActive ? "page" : undefined} title={link.label}>
             <span className="nav-icon"><Icon name={link.icon} /></span>
             <span className="nav-text">{link.label}</span>
           </Link>
+          {dashboardActive ? <Link className={`nav-sublink${pathname === "/paneles/pendiente" ? " active" : ""}`} href="/paneles/pendiente" aria-current={pathname === "/paneles/pendiente" ? "page" : undefined}>Pendiente</Link> : null}
+          </div>
         );
       })}
     </nav>

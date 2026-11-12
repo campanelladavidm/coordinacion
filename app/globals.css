@@ -2050,9 +2050,75 @@ html[data-theme="light"] .crew-products-table thead th:first-child { background:
 html[data-theme="light"] .crew-products-table tbody td { background: #fbfdff; }
 html[data-theme="light"] .crew-product-checkbox { border-color: #afc0d0; background: #fff; }
 html[data-theme="light"] .crew-product-checkbox:checked { border-color: #3189ad; background: #3189ad; }
+.nav-link-group { display: grid; gap: 2px; }
+.nav-sublink { display: flex; min-height: 30px; align-items: center; margin-left: 34px; border-left: 2px solid color-mix(in srgb, #6ba9d6 48%, transparent); border-radius: 0 6px 6px 0; padding: 0 9px; color: var(--muted); font-size: 11px; transition: background .15s, color .15s, border-color .15s; }
+.nav-sublink:hover { background: rgb(67 133 186 / 7%); color: var(--text); }
+.nav-sublink.active { border-left-color: #6ba9d6; background: rgb(67 133 186 / 13%); color: #e1edf8; }
+html[data-theme="light"] .nav-sublink.active { border-left-color: #6f9fc3; background: #e7f1f8; color: #244c6c; }
+html[data-theme="light"] .nav-sublink { border-left-color: color-mix(in srgb, #6f9fc3 52%, transparent); }
+html[data-theme="light"] .nav-sublink.active { border-left-color: #6f9fc3; }
+.pending-page { display: grid; gap: 14px; }
+.pending-entry { padding: 16px; }
+.pending-entry-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 15px; }
+.pending-entry-heading > div { display: flex; align-items: center; gap: 10px; }
+.pending-entry-heading h2, .pending-chart-heading h2, .pending-history h2 { margin: 0; color: var(--text); font-size: 15px; font-weight: 650; }
+.pending-entry-icon, .pending-chart-icon { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent); border-radius: 7px; color: var(--accent); font-size: 20px; line-height: 1; }
+.pending-date-field, .pending-value-field { display: grid; min-width: 0; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 550; }
+.pending-date-field input, .pending-value-field input { width: 100%; min-width: 0; height: 36px; border: 1px solid var(--border); border-radius: 7px; outline: 0; background: var(--background); padding: 0 10px; color: var(--text); font: inherit; font-size: 12px; }
+.pending-date-field input:focus, .pending-value-field input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent); }
+.pending-date-field { width: 190px; flex: 0 0 190px; }
+.pending-category-fields { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: end; gap: 11px 12px; }
+.pending-value-field > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pending-save-button { min-height: 36px; white-space: nowrap; }
+.pending-feedback { min-height: 16px; margin-top: 9px; color: var(--muted); font-size: 10px; }
+.pending-error { color: #e58a91; }
+.pending-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.pending-summary-card { display: grid; min-width: 0; gap: 6px; padding: 13px 15px; }
+.pending-summary-card > span { color: var(--muted); font-size: 10px; }
+.pending-summary-card strong { overflow: hidden; color: var(--text); font-size: 21px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
+.pending-summary-card small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.pending-summary-card.is-down strong, .pending-summary-card.is-down small { color: #45c596; }
+.pending-summary-card.is-up strong, .pending-summary-card.is-up small { color: #e58b7d; }
+.pending-chart-card { min-width: 0; padding: 16px; }
+.pending-chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.pending-chart-heading > div { display: flex; min-width: 0; align-items: center; gap: 10px; }
+.pending-chart-heading p, .pending-history header p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.pending-chart-total { color: var(--text); font-size: 15px; font-weight: 650; white-space: nowrap; }
+.pending-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 2px; }
+.pending-legend-item { display: inline-flex; min-height: 27px; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; background: transparent; padding: 0 9px; color: var(--muted); font: inherit; font-size: 10px; cursor: pointer; }
+.pending-legend-item i { width: 7px; height: 7px; border-radius: 50%; background: var(--series-color); opacity: .45; }
+.pending-legend-item.is-visible { color: var(--text); }
+.pending-legend-item.is-visible i { opacity: 1; box-shadow: 0 0 0 2px color-mix(in srgb, var(--series-color) 15%, transparent); }
+.pending-chart-scroll { max-width: 100%; overflow-x: auto; }
+.pending-chart { display: block; width: 100%; min-width: 680px; height: auto; overflow: visible; }
+.pending-chart-grid { stroke: color-mix(in srgb, var(--border) 82%, transparent); stroke-width: 1; }
+.pending-chart-grid-vertical { opacity: .45; }
+.pending-chart-label { fill: var(--muted); font-size: 11px; }
+.pending-chart-line { fill: none; stroke: var(--series-color); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; opacity: .86; }
+.pending-chart-point { fill: var(--series-color); stroke: var(--surface); stroke-width: 1.4; }
+.pending-chart-state { display: grid; min-height: 280px; place-items: center; color: var(--muted); font-size: 12px; text-align: center; }
+.pending-history { min-width: 0; overflow: hidden; }
+.pending-history > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--border); padding: 14px 16px; }
+.pending-history > header > span { border: 1px solid var(--border); border-radius: 999px; padding: 4px 9px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.pending-table-wrap { max-width: 100%; overflow: auto; }
+.pending-history table { width: 100%; min-width: 1400px; border-collapse: separate; border-spacing: 0; }
+.pending-history th, .pending-history td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 9px 10px; color: var(--muted); font-size: 10px; text-align: center; white-space: nowrap; }
+.pending-history thead th { position: sticky; z-index: 1; top: 0; background: var(--surface-raised); color: var(--muted); font-weight: 600; }
+.pending-history tbody th { position: sticky; left: 0; background: var(--surface); color: var(--text); font-weight: 550; text-align: left; }
+.pending-history thead th:first-child { left: 0; z-index: 2; text-align: left; }
+.pending-history tr:last-child th, .pending-history tr:last-child td { border-bottom: 0; }
+.pending-history th:last-child, .pending-history td:last-child { border-right: 0; }
+.pending-history td.pending-table-total { color: var(--text); font-weight: 700; }
+.pending-variation { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pending-variation.is-down { color: #45c596; }
+.pending-variation.is-up { color: #e58b7d; }
+.pending-variation.is-flat { color: var(--muted); }
+.pending-history .pending-table-empty { height: 66px; color: var(--muted); text-align: center; }
 @media (max-width: 700px) { .crew-products-backdrop { align-items: end; padding: 8px; } .crew-products-modal { width: 100%; max-height: calc(100dvh - 16px); border-radius: 14px 14px 8px 8px; } .crew-products-heading { padding: 17px 16px 14px; } .crew-products-heading h2 { font-size: 19px; } .crew-products-content { padding: 14px 12px; } .crew-products-table { min-width: 870px; } .crew-products-table th, .crew-products-table td { padding: 7px; } .crew-products-footer { padding: 12px; } }
 @media (max-width: 640px) { .wiki-editor-toolbar { gap: 3px; padding: 6px; } .wiki-editor-toolbar select { max-width: 104px; } .wiki-editor-surface { min-height: 190px; padding: 12px; } }
 @media (max-width: 700px) { .modelos-equipo-list { grid-template-columns: 1fr; padding: 10px; } .modelos-equipo-row { flex-wrap: wrap; } }
+@media (max-width: 1150px) { .pending-category-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); } .pending-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .pending-category-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .pending-entry-heading { align-items: flex-start; flex-direction: column; } .pending-date-field { width: 100%; max-width: 260px; flex-basis: auto; } .pending-save-button { grid-column: 1 / -1; } .pending-summary-card { padding: 11px; } .pending-chart-card { padding: 12px; } .pending-chart-heading { align-items: flex-start; } .pending-chart-total { font-size: 12px; } .pending-history > header { align-items: flex-start; padding: 12px; } .pending-history > header p { max-width: 45ch; line-height: 1.4; } }
 @media (max-width: 640px) {
   .app-sidebar { width: 158px; padding-right: 8px; padding-left: 8px; }
   .sidebar-brand img { width: 112px; }

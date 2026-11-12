@@ -86,6 +86,10 @@ export type Database = {
         { id: string; mes: number; anio: number; ticket: string; numero_cliente: string; realiza_id: string | null; pertenece_id: string | null; motivo: string; creado_por: string; actualizado_por: string; created_at: string; updated_at: string },
         { id?: string; mes: number; anio: number; ticket?: string; numero_cliente?: string; realiza_id?: string | null; pertenece_id?: string | null; motivo?: string; creado_por: string; actualizado_por: string; created_at?: string; updated_at?: string }
       >;
+      pendientes_diarios: Table<
+        { id: string; fecha: string; categoria: string; cantidad: number; creado_por: string; created_at: string; updated_at: string },
+        { id?: string; fecha: string; categoria: string; cantidad?: number; creado_por: string; created_at?: string; updated_at?: string }
+      >;
       actuaciones_jefe: Table<
         { id: string; jefe_id: string | null; usuario_contexto_id: string | null; tabla: string; operacion: string; fila_id: string | null; datos_anteriores: unknown; datos_nuevos: unknown; created_at: string },
         { id?: string; jefe_id?: string | null; usuario_contexto_id?: string | null; tabla: string; operacion: string; fila_id?: string | null; datos_anteriores?: unknown; datos_nuevos?: unknown; created_at?: string }
