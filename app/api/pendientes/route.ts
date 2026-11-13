@@ -40,18 +40,33 @@ export async function GET(request: NextRequest) {
   if ("response" in auth) return auth.response;
   const selectedDate = request.nextUrl.searchParams.get("fecha") ?? new Date().toISOString().slice(0, 10);
   if (!validDate(selectedDate)) return NextResponse.json({ error: "La fecha no es válida." }, { status: 400 });
-
-  const from = new Date(`${selectedDate}T00:00:00.000Z`);
-  from.setUTCDate(from.getUTCDate() - 29);
+  const requestedFrom = request.nextUrl.searchParams.get("desde");
+  const requestedTo = request.nextUrl.searchParams.get("hasta");
+  const from = requestedFrom ?? (() => { const date = new Date(`${selectedDate}T00:00:00.000Z`); date.setUTCDate(date.getUTCDate() - 29); return date.toISOString().slice(0, 10); })();
+  const to = requestedTo ?? selectedDate;
+  if (!validDate(selectedDate) || !validDate(from) || !validDate(to) || from > to || (new Date(`${to}T00:00:00.000Z`).getTime() - new Date(`${from}T00:00:00.000Z`).getTime()) / 86_400_000 > 90) {
+    return NextResponse.json({ error: "El rango de fechas no es válido." }, { status: 400 });
+  }
   try {
     const admin = createAdminClient();
-    const { data, error } = await admin.from("pendientes_diarios")
+    const consultaRango = admin.from("pendientes_diarios")
       .select("fecha,categoria,cantidad")
-      .gte("fecha", from.toISOString().slice(0, 10))
-      .lte("fecha", selectedDate)
+      .gte("fecha", from)
+      .lte("fecha", to)
       .order("fecha", { ascending: true });
-    if (error) throw error;
-    return NextResponse.json({ registros: data ?? [], fecha: selectedDate });
+    const consultaUltimaFecha = admin.from("pendientes_diarios").select("fecha").order("fecha", { ascending: false }).limit(1).maybeSingle();
+    const selectedIsInRange = selectedDate >= from && selectedDate <= to;
+    const [rango, seleccionado, ultimaFecha] = await Promise.all([
+      consultaRango,
+      selectedIsInRange ? Promise.resolve({ data: [], error: null }) : admin.from("pendientes_diarios").select("fecha,categoria,cantidad").eq("fecha", selectedDate),
+      consultaUltimaFecha,
+    ]);
+    if (rango.error) throw rango.error;
+    if (seleccionado.error) throw seleccionado.error;
+    if (ultimaFecha.error) throw ultimaFecha.error;
+    const registros = [...(rango.data ?? []), ...(seleccionado.data ?? [])];
+    const unicos = new Map(registros.map((row) => [`${row.fecha}:${row.categoria}`, row]));
+    return NextResponse.json({ registros: [...unicos.values()].sort((a, b) => a.fecha.localeCompare(b.fecha)), fecha: selectedDate, ultimaFechaConRegistro: ultimaFecha.data?.fecha ?? null });
   } catch (error) { return errorResponse(error); }
 }
 
@@ -76,6 +91,20 @@ export async function PUT(request: NextRequest) {
     }
     const admin = createAdminClient();
     const { error } = await admin.from("pendientes_diarios").upsert(registros as NonNullable<(typeof registros)[number]>[], { onConflict: "fecha,categoria" });
+    if (error) throw error;
+    return NextResponse.json({ ok: true, fecha: body.fecha });
+  } catch (error) { return errorResponse(error); }
+}
+
+export async function DELETE(request: NextRequest) {
+  if (!permitted(request)) return NextResponse.json({ error: "Origen de solicitud no permitido." }, { status: 403 });
+  const auth = await authenticatedUser();
+  if ("response" in auth) return auth.response;
+  try {
+    const body = await request.json() as { fecha?: unknown };
+    if (!validDate(body.fecha)) return NextResponse.json({ error: "La fecha no es válida." }, { status: 400 });
+    const admin = createAdminClient();
+    const { error } = await admin.from("pendientes_diarios").delete().eq("fecha", body.fecha);
     if (error) throw error;
     return NextResponse.json({ ok: true, fecha: body.fecha });
   } catch (error) { return errorResponse(error); }
