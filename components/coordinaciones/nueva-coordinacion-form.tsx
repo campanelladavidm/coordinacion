@@ -84,6 +84,7 @@ export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales,
     const formulario = new FormData(formularioElemento);
     const fecha = String(formulario.get("fecha") || "");
     const ticket = String(formulario.get("ticket") || "").trim();
+    const cliente = String(formulario.get("cliente") || "").trim();
     const camposObligatorios: [string, string][] = [
       [fecha, "la fecha"],
       [ticket, "el número de ticket"],
@@ -105,6 +106,16 @@ export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales,
         ? catalogos.cuadrillas.find((item) => item.id === duplicada.cuadrillaId)?.nombre ?? "desconocida"
         : "sin cuadrilla asignada";
       setError(`El TK ${duplicada.ticket} ya fue coordinado el ${new Date(`${duplicada.fecha}T00:00:00`).toLocaleDateString("es-AR")} en la cuadrilla ${cuadrilla}.`);
+      return;
+    }
+    const clienteDuplicado = coordinaciones.find((item) => item.id !== inicial?.id
+      && item.fecha === fecha
+      && item.cliente.trim().toLocaleUpperCase("es") === cliente.toLocaleUpperCase("es"));
+    if (clienteDuplicado) {
+      const cuadrilla = clienteDuplicado.cuadrillaId
+        ? catalogos.cuadrillas.find((item) => item.id === clienteDuplicado.cuadrillaId)?.nombre ?? "desconocida"
+        : "sin cuadrilla asignada";
+      setError(`El cliente ${clienteDuplicado.cliente} ya fue coordinado el ${new Date(`${clienteDuplicado.fecha}T00:00:00`).toLocaleDateString("es-AR")} en la cuadrilla ${cuadrilla}.`);
       return;
     }
     setGuardando(true);
@@ -181,7 +192,7 @@ export function NuevaCoordinacionForm({ fecha, coordinacionId, valoresIniciales,
           <section className="panel coordination-error-modal" role="alertdialog" aria-modal="true" aria-labelledby="coordination-error-title" aria-describedby="coordination-error-description">
             <span className="coordination-error-icon" aria-hidden="true">!</span>
             <p className="eyebrow">AVISO DE COORDINACIÓN</p>
-            <h2 id="coordination-error-title">{error.includes("ya fue coordinado") ? "TK ya coordinado" : "No se pudo guardar"}</h2>
+            <h2 id="coordination-error-title">{error.startsWith("El TK ") ? "TK ya coordinado" : error.startsWith("El cliente ") ? "Cliente ya coordinado" : "No se pudo guardar"}</h2>
             <p id="coordination-error-description">{error}</p>
             <button className="button button-primary" type="button" onClick={() => setError("")}>Entendido</button>
           </section>

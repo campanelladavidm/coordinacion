@@ -71,8 +71,22 @@ function validarTicketDuplicado(coordinaciones: Coordinacion[], cuadrillas: Cuad
   }
 }
 
+function validarClienteDuplicado(coordinaciones: Coordinacion[], cuadrillas: CuadrillaCatalogo[], cliente: string, fecha: string, excluirId?: string) {
+  const clienteNormalizado = cliente.trim().toLocaleUpperCase("es");
+  const existente = coordinaciones.find((item) => item.id !== excluirId
+    && item.fecha === fecha
+    && item.cliente.trim().toLocaleUpperCase("es") === clienteNormalizado);
+  if (existente) {
+    const cuadrilla = existente.cuadrillaId
+      ? cuadrillas.find((item) => item.id === existente.cuadrillaId)?.nombre ?? "desconocida"
+      : "sin cuadrilla asignada";
+    const fechaVisible = new Date(`${fecha}T00:00:00`).toLocaleDateString("es-AR");
+    throw new Error(`El cliente ${existente.cliente} ya fue coordinado el ${fechaVisible} en la cuadrilla ${cuadrilla}.`);
+  }
+}
+
 function validarTicketDuplicadoEnFilas(
-  filas: { id: string; ticket: string; cuadrilla_id: string | null }[],
+  filas: { id: string; ticket: string; cliente: string; cuadrilla_id: string | null }[],
   cuadrillas: CuadrillaCatalogo[],
   ticket: string,
   fecha: string,
@@ -87,6 +101,25 @@ function validarTicketDuplicadoEnFilas(
       : "sin cuadrilla asignada";
     const fechaVisible = new Date(`${fecha}T00:00:00`).toLocaleDateString("es-AR");
     throw new Error(`El TK ${existente.ticket} ya fue coordinado el ${fechaVisible} en la cuadrilla ${nombreCuadrilla}.`);
+  }
+}
+
+function validarClienteDuplicadoEnFilas(
+  filas: { id: string; ticket: string; cliente: string; cuadrilla_id: string | null }[],
+  cuadrillas: CuadrillaCatalogo[],
+  cliente: string,
+  fecha: string,
+  excluirId?: string,
+) {
+  const clienteNormalizado = cliente.trim().toLocaleUpperCase("es");
+  const existente = filas.find((item) => item.id !== excluirId
+    && item.cliente.trim().toLocaleUpperCase("es") === clienteNormalizado);
+  if (existente) {
+    const nombreCuadrilla = existente.cuadrilla_id
+      ? cuadrillas.find((item) => item.id === existente.cuadrilla_id)?.nombre ?? "desconocida"
+      : "sin cuadrilla asignada";
+    const fechaVisible = new Date(`${fecha}T00:00:00`).toLocaleDateString("es-AR");
+    throw new Error(`El cliente ${existente.cliente} ya fue coordinado el ${fechaVisible} en la cuadrilla ${nombreCuadrilla}.`);
   }
 }
 
@@ -279,13 +312,15 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
   const crearCoordinacion = useCallback(async (nueva: NuevaCoordinacion) => {
     validarTicketDuplicado(coordinaciones, catalogos.cuadrillas, nueva.ticket, nueva.fecha);
+    validarClienteDuplicado(coordinaciones, catalogos.cuadrillas, nueva.cliente, nueva.fecha);
     const supabase = createClient();
     const { data: coordinacionesDelDia, error: consultaDuplicadosError } = await supabase
       .from("coordinaciones")
-      .select("id,ticket,cuadrilla_id")
+      .select("id,ticket,cliente,cuadrilla_id")
       .eq("fecha", nueva.fecha);
     lanzarError(consultaDuplicadosError);
     validarTicketDuplicadoEnFilas(coordinacionesDelDia ?? [], catalogos.cuadrillas, nueva.ticket, nueva.fecha);
+    validarClienteDuplicadoEnFilas(coordinacionesDelDia ?? [], catalogos.cuadrillas, nueva.cliente, nueva.fecha);
     const { data: auth } = await supabase.auth.getUser();
     const orden = coordinaciones.filter((item) => item.fecha === nueva.fecha && item.tercerizadaId === nueva.tercerizadaId && item.cuadrillaId === nueva.cuadrillaId).reduce((mayor, item) => Math.max(mayor, item.orden), -1) + 1;
     const { data, error: insertError } = await supabase.from("coordinaciones").insert({
@@ -305,13 +340,15 @@ export function DemoDataProvider({ children }: { children: ReactNode }) {
 
   const actualizarCoordinacion = useCallback(async (id: string, actualizacion: NuevaCoordinacion) => {
     validarTicketDuplicado(coordinaciones, catalogos.cuadrillas, actualizacion.ticket, actualizacion.fecha, id);
+    validarClienteDuplicado(coordinaciones, catalogos.cuadrillas, actualizacion.cliente, actualizacion.fecha, id);
     const supabase = createClient();
     const { data: coordinacionesDelDia, error: consultaDuplicadosError } = await supabase
       .from("coordinaciones")
-      .select("id,ticket,cuadrilla_id")
+      .select("id,ticket,cliente,cuadrilla_id")
       .eq("fecha", actualizacion.fecha);
     lanzarError(consultaDuplicadosError);
     validarTicketDuplicadoEnFilas(coordinacionesDelDia ?? [], catalogos.cuadrillas, actualizacion.ticket, actualizacion.fecha, id);
+    validarClienteDuplicadoEnFilas(coordinacionesDelDia ?? [], catalogos.cuadrillas, actualizacion.cliente, actualizacion.fecha, id);
     const anterior = coordinaciones.find((item) => item.id === id);
     const cambiaGrupo = anterior && (anterior.fecha !== actualizacion.fecha || anterior.tercerizadaId !== actualizacion.tercerizadaId || anterior.cuadrillaId !== actualizacion.cuadrillaId);
     const orden = cambiaGrupo

@@ -2094,7 +2094,7 @@ html[data-theme="light"] .nav-sublink.active { border-left-color: #6f9fc3; }
 .pending-chart { display: block; width: 100%; min-width: 680px; height: auto; overflow: visible; }
 .pending-chart-grid { stroke: color-mix(in srgb, var(--border) 68%, transparent); stroke-width: .55; }
 .pending-chart-grid-vertical { opacity: .45; }
-.pending-chart-label { fill: var(--muted); font-size: 7.5px; }
+.pending-chart-label { fill: var(--muted); font-size: 7px; }
 .pending-chart-line { fill: none; stroke: var(--series-color); stroke-linecap: round; stroke-linejoin: round; stroke-width: .65; opacity: .78; }
 .pending-chart-point { fill: var(--series-color); stroke: var(--surface); stroke-width: .6; }
 .pending-chart-tooltip { position: absolute; z-index: 3; box-sizing: border-box; max-height: min(330px, calc(100% - 16px)); overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised); padding: 10px 12px; color: var(--text); box-shadow: 0 12px 32px rgb(0 0 0 / 40%); pointer-events: none; }
