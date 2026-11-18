@@ -288,7 +288,7 @@ export function PendienteDashboard() {
               {chart.xTicks.map((tick) => <g key={tick.dia}>{tick.showGrid && <line className="pending-chart-grid pending-chart-grid-vertical" x1={tick.x} x2={tick.x} y1={CHART_MARGIN.top} y2={CHART_HEIGHT - CHART_MARGIN.bottom} />}<text className="pending-chart-label" x={tick.x} y={CHART_HEIGHT - 15} textAnchor="middle">{shortDate(tick.dia)}</text></g>)}
               {chart.series.map((series) => <g key={series.id}>
                 {series.points.length > 1 ? <path className="pending-chart-line" d={series.path} style={{ "--series-color": series.color } as React.CSSProperties} /> : null}
-                {series.points.map((point) => <circle key={point.dia} className="pending-chart-point" cx={point.x} cy={point.y} r="3.2" style={{ "--series-color": series.color } as React.CSSProperties} />)}
+                {series.points.map((point) => <circle key={point.dia} className="pending-chart-point" cx={point.x} cy={point.y} r="1.6" style={{ "--series-color": series.color } as React.CSSProperties} />)}
               </g>)}
               {!chart.series.some((series) => series.points.length) && <text className="pending-chart-label" x={CHART_MARGIN.left + chart.plotWidth / 2} y={CHART_MARGIN.top + chart.plotHeight / 2} textAnchor="middle">Todavía no hay registros en este período.</text>}
             </svg>

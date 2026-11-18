@@ -2083,20 +2083,20 @@ html[data-theme="light"] .nav-sublink.active { border-left-color: #6f9fc3; }
 .pending-chart-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .pending-chart-heading > div { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .pending-chart-heading p, .pending-history header p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
-.pending-chart-total { color: var(--text); font-size: 15px; font-weight: 650; white-space: nowrap; }
-.pending-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 2px; }
-.pending-legend-item { display: inline-flex; min-height: 27px; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; background: transparent; padding: 0 9px; color: var(--muted); font: inherit; font-size: 10px; cursor: pointer; }
-.pending-legend-item i { width: 7px; height: 7px; border-radius: 50%; background: var(--series-color); opacity: .45; }
+.pending-chart-total { color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.pending-legend { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0 2px; }
+.pending-legend-item { display: inline-flex; min-height: 24px; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: 999px; background: transparent; padding: 0 8px; color: var(--muted); font: inherit; font-size: 9px; cursor: pointer; }
+.pending-legend-item i { width: 6px; height: 6px; border-radius: 50%; background: var(--series-color); opacity: .45; }
 .pending-legend-item.is-visible { color: var(--text); }
 .pending-legend-item.is-visible i { opacity: 1; box-shadow: 0 0 0 2px color-mix(in srgb, var(--series-color) 15%, transparent); }
 .pending-chart-frame { position: relative; max-width: 100%; }
 .pending-chart-scroll { max-width: 100%; overflow-x: auto; }
 .pending-chart { display: block; width: 100%; min-width: 680px; height: auto; overflow: visible; }
-.pending-chart-grid { stroke: color-mix(in srgb, var(--border) 82%, transparent); stroke-width: 1; }
+.pending-chart-grid { stroke: color-mix(in srgb, var(--border) 68%, transparent); stroke-width: .55; }
 .pending-chart-grid-vertical { opacity: .45; }
-.pending-chart-label { fill: var(--muted); font-size: 11px; }
-.pending-chart-line { fill: none; stroke: var(--series-color); stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; opacity: .86; }
-.pending-chart-point { fill: var(--series-color); stroke: var(--surface); stroke-width: 1.4; }
+.pending-chart-label { fill: var(--muted); font-size: 7.5px; }
+.pending-chart-line { fill: none; stroke: var(--series-color); stroke-linecap: round; stroke-linejoin: round; stroke-width: .65; opacity: .78; }
+.pending-chart-point { fill: var(--series-color); stroke: var(--surface); stroke-width: .6; }
 .pending-chart-tooltip { position: absolute; z-index: 3; box-sizing: border-box; max-height: min(330px, calc(100% - 16px)); overflow: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised); padding: 10px 12px; color: var(--text); box-shadow: 0 12px 32px rgb(0 0 0 / 40%); pointer-events: none; }
 .pending-chart-tooltip h3 { margin: 0 0 7px; border-bottom: 1px solid var(--border); padding: 0 0 7px; color: var(--text); font-size: 12px; font-weight: 700; }
 .pending-chart-tooltip-rows { display: grid; gap: 3px; }
